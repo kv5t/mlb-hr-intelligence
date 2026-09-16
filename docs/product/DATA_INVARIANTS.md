@@ -21,7 +21,7 @@
 | R-07 | Date-only affiliation bounds can claim only `DATE` or `UNKNOWN` precision; game-specific team attribution comes from participation/PA. | Model validation. |
 | R-04 | Every participation and PA team is one of the game's two teams. `PA.batting_team_id` and `PA.fielding_team_id` differ. | Domain validation; FKs. |
 | R-05 | A game's player-team attribution comes from its observed participation/PA, not a current roster lookup. | Domain query test. |
-| R-06 | `PlayerGameParticipation` is unique by `(game, player)` for 0.1; a verified exception must trigger model review, not silent overwrite. | Unique key plus reconciliation. |
+| R-06 | `PlayerGameParticipation` is unique by `(game, player, team)`. The same player may represent both clubs in one suspended/resumed contest; no `(game, player)` unique constraint is allowed. | Unique key plus reconciliation. |
 
 ## Game and time invariants
 
@@ -41,7 +41,7 @@
 | ID | Rule | Candidate enforcement |
 | --- | --- | --- |
 | P-01 | No participation row means unassessed. It cannot be interpreted as `DID_NOT_APPEAR`. | Analytics/query test. |
-| P-02 | `DID_NOT_APPEAR` requires affirmative source-backed assessment; it cannot coexist with a verified PA for that player/game. | Ingestion/domain validation. |
+| P-02 | `DID_NOT_APPEAR` requires affirmative source-backed assessment; it cannot coexist with a verified PA for that player/game/team. A different team row in the same game is assessed separately. | Ingestion/domain validation. |
 | P-03 | `APPEARED` may have zero PA. **Conditional:** with `pa_coverage=COMPLETE` and zero PA rows, zero is known; otherwise PA count may be unknown. | Coverage/consistency test. |
 | P-04 | `reported_pa_count` is nullable and nonnegative when known; it is a sourced observation, not a replacement for canonical PA rows. Disagreement is flagged. | Check/reconciliation. |
 | P-05 | Every PA references exactly one game, batter, batting team and fielding team. Pitcher is nullable only when genuinely unresolved, and pitcher-dependent analysis must then exclude or mark it missing. | FKs/domain validation. |

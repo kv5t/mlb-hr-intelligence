@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Architecture decision log
 
-**Status key:** Accepted = current architectural choice, not necessarily implemented. Planned = intended source/feature awaiting verification or later phase. Each decision can be revisited when its stated condition occurs. No provider endpoint or capability is claimed verified here.
+**Status key:** Accepted = current architectural choice, not necessarily implemented. Planned = intended source/feature awaiting verification or later phase. Each decision can be revisited when its stated condition occurs. Provider claims and verification now live in [PROVIDER_EVIDENCE.md](PROVIDER_EVIDENCE.md); earlier decisions retain their phase provenance.
 
 ## ADR-001 — Python and Django 5.2 backend
 
@@ -179,7 +179,7 @@
 - **Context:** DNP, zero-PA appearance and incomplete source coverage cannot share one zero value.
 - **Decision:** Use `PlayerGameParticipation` with `APPEARED/DID_NOT_APPEAR/UNKNOWN`, separate player PA coverage, and `GameDataCoverage` by game/domain. No row means unassessed.
 - **Rationale:** Known zero and missing observations remain distinguishable for later recurrence calculations.
-- **Consequences:** DNP needs affirmative evidence; final game status does not prove event coverage. Drought/window effects remain 0.0-C.
+- **Consequences:** DNP needs affirmative evidence; final game status does not prove event coverage. Drought/window effects are specified in [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md).
 - **Revisit when:** Provider coverage requires finer assessment scope or participation cases exceed the 0.1 model.
 
 ## ADR-021 — PA opportunity and separate HR event
@@ -197,7 +197,7 @@
 - **Context:** Multiple providers may name the same player/game differently or disagree on a fact.
 - **Decision:** Use provider-namespaced, entity-typed `ExternalIdentifier` references and separate `SourceRecordReference`/`FactSourceLink` evidence. Canonical IDs do not embed provider IDs; multiple source links may support or conflict with a fact.
 - **Rationale:** Reconciliation stays possible without making provider JSON the domain schema.
-- **Consequences:** Typed polymorphic targets require explicit domain validation and indexes. Authority, namespace/mapping and conflict policy remain 0.0-D; ingestion history remains 0.0-E.
+- **Consequences:** Typed polymorphic targets require explicit domain validation and indexes. Authority, namespace/mapping and conflict policy are in the 0.0-D provider documents; ingestion history remains 0.0-E.
 - **Revisit when:** Measured lookup cost or verified identifier behavior warrants typed per-entity storage.
 
 ## ADR-023 — Regular-season-only MVP analytical scope
@@ -235,3 +235,22 @@
 - **Rationale:** Results remain reproducible and do not hide missing observations or mix denominators.
 - **Consequences:** Some windows display nonnumeric KPIs until data is repaired; request N, actual count, cutoff and coverage reason must be visible. API/UI representation is specified later.
 - **Revisit when:** Verified coverage and user research justify a separately named partial-data estimate; never relabel it as the complete KPI.
+
+## ADR-027 — Cutoff-state current metrics and uncertain selection
+
+- **Status:** Accepted in 0.0-D closeout of 0.0-C.
+- **Decision:** Current game/PA drought and game streak scan backward beyond displayed N through the same season/filter scope. Maximum runs remain window-local. An unresolved same-day tie crossing N invalidates all window membership KPIs; an unknown official date may invalidate date-cutoff membership.
+- **Evidence:** Definition correction and deterministic cases in [KPI_TEST_CASES.md](KPI_TEST_CASES.md).
+
+## ADR-028 — Player participation uniqueness includes represented team
+
+- **Status:** Accepted from first-party game evidence.
+- **Decision:** Key participation by `(game, player, team)`. Full-season player batting-game count deduplicates one contest across represented teams; team-filtered events use their actual team.
+- **Evidence:** MLB game 746942, Danny Jansen 643376, documented in [PROVIDER_EVIDENCE.md](PROVIDER_EVIDENCE.md).
+
+## ADR-029 — Hybrid MLB lookup keys and provider aliases
+
+- **Status:** Accepted conceptually for 0.0-D; storage design remains 0.0-E/implementation.
+- **Decision:** Keep internal canonical PKs; add unique nullable verified MLB ID lookup columns on Player, Team, Venue and Game, plus generic typed `ExternalIdentifier` for aliases and secondary providers. Enforce consistency between any duplicated MLB alias and core key.
+- **Rationale:** The observed gamePk/player/team/venue IDs are frequent join and retrieval keys. Direct unique indexes and FKs on canonical entities simplify SQLite lookup and remain portable to PostgreSQL. Typed aliases preserve cross-provider linkage. The cost is explicit MLB coupling in nullable lookup fields, without making a provider ID the canonical identity.
+- **Evidence:** [PROVIDER_EVIDENCE.md](PROVIDER_EVIDENCE.md).

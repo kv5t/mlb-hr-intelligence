@@ -38,9 +38,20 @@ All names and numbers here are **synthetic toy data, not MLB facts**. These are 
 | Player PA sequence `(non-HR, non-HR, HR, non-HR)` | Current PA drought=1, maximum PA drought=2; game drought must be calculated from game sequence separately. |
 | Player PA sequence `(HR, non-HR, non-HR)` | Current PA drought=2, maximum PA drought=2. |
 | Complete empty scope | HR=0, PA=0, B=0, multi-HR games=0; HR/Game, Games With HR %, drought and streak=`NULL(NO_GAMES)`; HR/PA=`NULL(ZERO_DENOMINATOR)`. |
-| Same-day games lack game number/start distinction; HR outcomes differ | Canonical ID provides deterministic display order, marked `ORDER_UNVERIFIED`; order-sensitive KPI is `NULL(ORDER_UNVERIFIED)` if swapping them could change it. |
+| Same-day games lack game number/start distinction; HR outcomes differ; N=1 | Tied group straddles last-N boundary: entire window membership is `ORDER_UNVERIFIED`; HR total, rates and recurrence KPIs are `NULL(ORDER_UNVERIFIED)`. Canonical ID is display only. |
 | Team A matrix after Player A transfers to Team B and non-affiliation is verified | Team A later cell=`NOT_WITH_TEAM`, not `DNP`; earlier Team A HR remains on that row. |
 | Player A has older HR_EVENTS `PARTIAL` but latest complete game has 0 HR | Current HR streak=0 (latest decisive non-HR); full-window HR total and maximum streak remain `NULL(INCOMPLETE)`. |
 | Player A has older HR_EVENTS `PARTIAL` but latest complete game has 1 HR | Current game drought=0 (latest decisive HR); full-window HR total and maximum drought remain `NULL(INCOMPLETE)`. |
 
 The fixture pattern for future tests should assert both the **value** and the **semantic reason/annotation**, plus requested N, actual m, cutoff, and data-as-of. Each cell/state is tested independently from the player's rolling batting-game KPI.
+
+## 0.0-D cutoff-state and provider-exception cases
+
+| Synthetic/observed input | Exact expected result |
+| --- | --- |
+| Synthetic: last HR was 41 eligible batting games before cutoff; requested W=30G | Current game drought=41; maximum game drought within W may be 30. Do not annotate current value `NO_HR_IN_SCOPE` because an earlier in-scope HR exists. |
+| Synthetic: 10 consecutive HR batting games through cutoff; requested W=7G | Current streak=10; maximum streak inside W=7. |
+| Synthetic: 45 non-HR PAs since the last HR PA across eligible games; requested W=7G contains 29 of those PAs | Current PA drought=45; maximum PA drought inside W is at most 29. |
+| Synthetic: candidate game has unknown official date and could fall before or after the selected date cutoff | Selection and all dependent KPIs=`NULL(UNKNOWN)` until membership is established. |
+| Synthetic: an unresolved player participation could add a batting game to last-2 W | Window=`NULL(UNKNOWN/INCOMPLETE)`; `known_eligible_game_count` may be 2, but `actual_game_count` is not definitive. |
+| Observed MLB game 746942: Danny Jansen represented Toronto and Boston in one suspended/resumed contest | Two participation rows keyed `(game,player,team)` are valid; full-season player batting-game count deduplicates contest if any PA, team-filtered counts attribute PAs to each represented team. |

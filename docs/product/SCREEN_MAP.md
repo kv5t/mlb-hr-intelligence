@@ -104,7 +104,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 - **Information / KPIs:** Teams, score, status, participants, batters and pitchers where available, and HR events with game context. A completed game's HR count requires complete HR-event coverage; incomplete data must be labeled.
 - **Filters / actions / links:** Event view/filter by team; open player, team, HR event/source detail when available; return to Games or matrix.
 - **Desktop / tablet / mobile:** Score header and parallel team/event panels / stacked panels / compact score and chronological events.
-- **Loading / empty / partial / error:** Game header skeleton / no HR events or no eligible game / show known score/status and flag unavailable lineup/event sections / retry affected section.
+- **Loading / empty / partial / error:** Game header skeleton / no HR events or no eligible game / show known score/status and flag unavailable participant/batter/pitcher/event sections / retry affected section.
 - **Future:** Starting-lineup detail if verified; 0.2 Statcast pitch and batted-ball details; 0.3 contextual matchup/weather; 0.4 labeled validated estimates.
 
 ## Matchup Lab

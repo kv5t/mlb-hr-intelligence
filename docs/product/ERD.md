@@ -33,17 +33,20 @@ erDiagram
         uuid id PK
         string display_name "sourced"
         string abbreviation "sourced"
+        int mlb_id "optional unique lookup"
     }
     PLAYER {
         uuid id PK
         string display_name "sourced"
         string bats "L/R/S/unknown"
+        int mlb_id "optional unique lookup"
         string throws "L/R/unknown"
     }
     VENUE {
         uuid id PK
         string name "sourced"
         string timezone_id "optional"
+        int mlb_id "optional unique lookup"
     }
     PLAYER_TEAM_AFFILIATION {
         uuid id PK
@@ -60,6 +63,7 @@ erDiagram
         uuid away_team_id FK
         uuid venue_id "optional FK"
         string game_type
+        int mlb_game_pk "optional unique lookup"
         date official_date "optional"
         datetime scheduled_start_at_utc "optional"
         datetime actual_start_at_utc "optional"
@@ -111,7 +115,7 @@ erDiagram
     }
 ```
 
-`Team` has two distinct roles in `Game`. `PlateAppearance` likewise has batting and fielding team roles and a nullable pitcher reference. `PlayerGameParticipation` rows express assessed states; their absence means unassessed. `GameDataCoverage` is a current assessment per game/domain, with assessment history handled by the future ingestion design. `HomeRunEvent` obtains batter, game and team through its one PA, avoiding competing references.
+`Team` has two distinct roles in `Game`. `PlateAppearance` likewise has batting and fielding team roles and a nullable pitcher reference. `PlayerGameParticipation` rows are unique by `(game, player, team)` and express assessed states; their absence means unassessed. `GameDataCoverage` is a current assessment per game/domain, with assessment history handled by the future ingestion design. `HomeRunEvent` obtains batter, game and team through its one PA, avoiding competing references.
 
 ## Supporting/provenance references
 

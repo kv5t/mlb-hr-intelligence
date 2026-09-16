@@ -16,10 +16,10 @@
 | HR Gap | Count of eligible non-HR games strictly between consecutive HR games; consecutive HR games have gap 0. | Formula in KPI_SPEC. |
 | Average HR Gap | Arithmetic mean of consecutive HR gaps; needs ≥2 HR games. | Formula in KPI_SPEC. |
 | Median HR Gap | Statistical median of consecutive HR gaps; needs ≥2 HR games. | Formula in KPI_SPEC. |
-| Current HR Drought | Trailing non-HR run, explicitly labeled in eligible games or player PAs. | Formulas in KPI_SPEC. |
+| Current HR Drought | Trailing non-HR run at cutoff across the same season and filters, explicitly labeled in eligible games or player PAs; it can extend before the displayed N-game window. | Formulas in KPI_SPEC. |
 | Maximum HR Drought | Longest non-HR run inside scope, including leading and trailing edges; label game or PA unit. | Formulas in KPI_SPEC. |
 | HR Streak | Consecutive eligible games with ≥1 HR. | Formula in KPI_SPEC. |
-| Current HR Streak | Trailing HR-game run at the selected cutoff. | Formula in KPI_SPEC. |
+| Current HR Streak | Trailing HR-game run at cutoff across the same season and filters; it can extend before the displayed N-game window. | Formula in KPI_SPEC. |
 | Maximum HR Streak | Longest HR-game run inside selected scope. | Formula in KPI_SPEC. |
 | Production | Count or rate of HR output and opportunities, including HR/Game, HR/PA and PA/HR. | MVP formulas in KPI_SPEC. |
 | Recurrence | Pattern of HR games: frequency, gaps, droughts and streaks; never a synonym for HR/Game. | MVP formulas in KPI_SPEC. |

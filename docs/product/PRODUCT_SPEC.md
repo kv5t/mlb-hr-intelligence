@@ -20,7 +20,7 @@ The original manually generated PDF is a **UX reference only**. Its example stat
 1. **Production and recurrence are separate.** HR, HR/Game, HR/PA, and PA/HR describe production or rate. HR-game frequency, gaps, droughts, and streaks describe recurrence. HR/Game must never be labeled recurrence.
 2. **Show evidence.** Every displayed HR should eventually trace from player and matrix cell to game, HR event, and provider source. Derived KPIs must be reproducible. Show data provenance and freshness when available.
 3. **Label knowledge type.** Distinguish observed statistics, derived metrics, context, and model outputs in labels and visual treatment. A rating or probability is never presented as an observed statistic.
-4. **Do not invent precision.** Surface denominators, sample size, missing data, provisional status, and uncertainty where relevant. Statistical definitions remain open until 0.0-C.
+4. **Do not invent precision.** Surface denominators, sample size, missing data, provisional status, and uncertainty where relevant. Statistical definitions are in [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md).
 5. **One analytics definition across outputs.** React, DRF, CSV, and PDF consume the same canonical analytics layer; a report must not silently recompute a KPI differently.
 6. **Keep providers at the boundary.** Provider adapters normalize and validate into canonical domain data. Preserve external IDs for traceability; provider field names do not dictate domain models. Exact fields belong to 0.0-B and mappings and authority to 0.0-D.
 7. **Descriptive before predictive.** No arbitrary scores, Elo-like HR ratings, or probability claims in 0.1. Models need historical validation, calibration, sample-size and uncertainty communication in 0.4.
@@ -33,7 +33,7 @@ Desktop primary navigation: **Today, League, Teams, Players, Games, Matchup, Exp
 | Workflow | Entry → result | First available |
 | --- | --- | --- |
 | Discover HR leaders | League leaderboard → player/team → underlying games and HR log | 0.1 |
-| Compare recurrence | League recurrence view → team matrix → cell/game/event | 0.1; exact cell semantics pending 0.0-B/C |
+| Compare recurrence | League recurrence view → team matrix → cell/game/event | 0.1; cell semantics in [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) |
 | Inspect a player | Search/list → player overview → recurrence and HR log | 0.1 |
 | Follow today's games | Today → game detail → HR events | 0.1 |
 | Export a period | League/team/player view → CSV or panoramic PDF using shared metrics | 0.1 |
@@ -61,7 +61,7 @@ The intended drill-down is player → matrix cell → game → plate appearance 
 
 Desktop supports dense tables and a horizontally scrolling matrix with sticky identity/summary columns and roughly 30 reachable game columns. Tablet starts with a shorter window and preserves all columns through scrolling. Mobile starts with a small window, retains player identity, uses touch-friendly cells and filter sheets, and allows the full dataset through navigation or export. The A3 landscape PDF is a panoramic static output; the website remains interactive. Virtualization may be used where scale justifies it.
 
-Cells carry numeric or textual meaning, never color alone. Use semantic tables where suitable, keyboard navigation, visible focus, screen-reader labels that identify player/game/value, sufficient contrast, browser zoom, responsive text, reduced motion, and adequate touch targets. Positive cells lead to game/event detail when available. DNP, zero PA, postponements, suspended games, and appearances require definitions before final cell semantics.
+Cells carry numeric or textual meaning, never color alone. Use semantic tables where suitable, keyboard navigation, visible focus, screen-reader labels that identify player/game/value, sufficient contrast, browser zoom, responsive text, reduced motion, and adequate touch targets. Positive cells lead to game/event detail when available. DNP, zero PA, postponements, suspended games and appearances follow [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md); provider evidence limits are in [PROVIDER_GAPS.md](PROVIDER_GAPS.md).
 
 ## Export concept
 

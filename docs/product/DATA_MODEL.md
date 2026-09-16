@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Canonical data model (0.0-B)
 
-**Status:** Conceptual 0.0-B architecture, not an ORM or SQL design. Names and fields below are canonical concepts. [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) resolve 0.0-C formulas and eligibility; 0.0-D must verify provider mappings and authority, and 0.0-E must design ingestion/versioning. No endpoint or provider field has been verified here.
+**Status:** Conceptual 0.0-B architecture, not an ORM or SQL design. Names and fields below are canonical concepts. [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) resolve 0.0-C formulas and eligibility; 0.0-D provider findings are recorded in [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md) and [PROVIDER_FIELD_MAPPING.md](PROVIDER_FIELD_MAPPING.md); 0.0-E designs ingestion/versioning. This document remains conceptual.
 
 ## 1. Modeling principles and classification
 
@@ -112,7 +112,7 @@ This small history prevents a postponement/reschedule from erasing the fact that
 | `pa_coverage` (required) | `COMPLETE/PARTIAL/UNKNOWN/NOT_APPLICABLE` for this player/game. |
 | provenance link(s) | Evidence for appearance, DNP, count and coverage. |
 
-`DID_NOT_APPEAR` requires affirmative evidence that the player was in the relevant assessed population and did not appear; an absent box-score row or mere team affiliation is insufficient. `APPEARED` with complete PA coverage and zero PA rows represents a pinch-runner/defensive appearance; a pinch hitter who walked has a PA even without an at-bat. `UNKNOWN` preserves uncertainty. Whether any state advances a drought is entirely 0.0-C.
+`DID_NOT_APPEAR` requires affirmative evidence that the player was in the relevant assessed population and did not appear; an absent box-score row or mere team affiliation is insufficient. `APPEARED` with complete PA coverage and zero PA rows represents a pinch-runner/defensive appearance; a pinch hitter who walked has a PA even without an at-bat. `UNKNOWN` preserves uncertainty. Eligibility and drought effects are defined in [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md). A player may have separate participation rows for both teams in one suspended/resumed contest.
 
 ### PlateAppearance — canonical opportunity observation
 
@@ -154,9 +154,9 @@ This is separate from game `finality`: a completed game may have incomplete impo
 
 `id`, stable `code` and display name identify an external system, not its authority. Planned candidates are MLB Stats API and Baseball Savant/Statcast; weather is deferred. Provider configuration and sync operations belong to 0.0-E, and authority by category to 0.0-D.
 
-### ExternalIdentifier — chosen generic, typed strategy
+### ExternalIdentifier — typed aliases alongside verified MLB IDs
 
-`id`, `provider_id`, `entity_kind`, `external_value`, `canonical_entity_id`, optional `valid_from/valid_to` and `resolution_state` (`ACTIVE/SUPERSEDED/AMBIGUOUS`) preserve MLB player/team/gamePk/venue IDs and future identifiers. `entity_kind` is restricted to known canonical kinds; a domain validator ensures `canonical_entity_id` targets the corresponding entity. Unique active `(provider, entity_kind, external_value)` maps to at most one canonical entity. Multiple source IDs may map to one canonical entity over time; ambiguous/misassigned IDs are flagged, not silently reused. This avoids provider-specific columns and supports future sources, at the cost of application-level typed target validation and indexed lookup. 0.0-D determines actual namespaces and collision behavior. Provider IDs are never canonical PKs.
+`id`, `provider_id`, `entity_kind`, `external_value`, `canonical_entity_id`, optional `valid_from/valid_to` and `resolution_state` (`ACTIVE/SUPERSEDED/AMBIGUOUS`) preserve MLB player/team/gamePk/venue IDs and future identifiers. `entity_kind` is restricted to known canonical kinds; a domain validator ensures `canonical_entity_id` targets the corresponding entity. Unique active `(provider, entity_kind, external_value)` maps to at most one canonical entity. Multiple source IDs may map to one canonical entity over time; ambiguous/misassigned IDs are flagged, not silently reused. For high-volume MLB lookup, 0.0-D selects a hybrid: nullable unique `mlb_id` on Player/Team/Venue and `mlb_game_pk` on Game, alongside generic typed aliases for secondary providers and historic corrections. These are lookup keys, never canonical PKs. Keep alias-to-core consistency and provider namespace validation; physical schema belongs to later phases.
 
 ### SourceRecordReference and FactSourceLink
 
@@ -187,7 +187,7 @@ See [ERD.md](ERD.md) for the diagram and [DATA_INVARIANTS.md](DATA_INVARIANTS.md
 
 Canonical instants are UTC. `Venue.timezone_id` enables local presentation; local display date/time is derived for UI and is not identity. `official_date` is a baseball designation, possibly different from the venue-local date and either UTC timestamp. `scheduled_start_at_utc` is a plan, `actual_start_at_utc` is observed start, and `completed_at_utc` is observed completion; none alone identifies a game. Null means unknown, not midnight or no game.
 
-Two games on the same date and between the same clubs retain separate `Game.id` and source mappings. `scheduled_game_number`, start times and official date help order/display them, but 0.0-C defines matrix/window order and 0.0-D verifies source semantics. A postponed game has a lifecycle observation and non-final state, with no inferred zero-HR observation. A rescheduled contest retains identity only when source reconciliation supports it. A suspended contest can have started, suspended, resumed and completed lifecycle events while retaining one `Game.id`; its official date and actual/completion instants remain separate. Whether and when it enters a window is 0.0-C.
+Two games on the same date and between the same clubs retain separate `Game.id` and source mappings. `scheduled_game_number`, start times and official date help order/display them, but 0.0-C defines matrix/window order and 0.0-D verifies source semantics. A postponed game has a lifecycle observation and non-final state, with no inferred zero-HR observation. A rescheduled contest retains identity only when source reconciliation supports it. A suspended contest can have started, suspended, resumed and completed lifecycle events while retaining one `Game.id`; its official date and actual/completion instants remain separate. Window entry is defined in [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md).
 
 ## 6. Missing, unknown and zero
 
@@ -195,11 +195,11 @@ No participation row means unassessed, not DNP. `UNKNOWN` participation means as
 
 ## 7. Uniqueness and invariants
 
-Canonical IDs are unique and immutable. A game has distinct home/away teams and one contest identity independent of date. Each participation is unique per `(game, player)` for 0.1; if a verified case of a player representing two teams in one game exists, revisit rather than overwrite. A PA belongs to one game and batter, has a unique `(game, game_pa_ordinal)` when ordinal is known, and valid batting/fielding game teams. `HomeRunEvent.plate_appearance_id` is unique and requires `PA.outcome_category=HOME_RUN`; one HR event cannot exist without its PA. A sourced external ID in an active provider namespace cannot silently identify two canonical entities. Affiliation intervals are retained; overlap alone is not invalid while boundary precision is limited. Fact/source links must resolve to existing typed targets. More detailed validation rules are in [DATA_INVARIANTS.md](DATA_INVARIANTS.md).
+Canonical IDs are unique and immutable. A game has distinct home/away teams and one contest identity independent of date. Each participation is unique per `(game, player, team)`; a player may have two represented-team rows in one contest, as observed for game 746942. A PA belongs to one game and batter, has a unique `(game, game_pa_ordinal)` when ordinal is known, and valid batting/fielding game teams. `HomeRunEvent.plate_appearance_id` is unique and requires `PA.outcome_category=HOME_RUN`; one HR event cannot exist without its PA. A sourced external ID in an active provider namespace cannot silently identify two canonical entities. Affiliation intervals are retained; overlap alone is not invalid while boundary precision is limited. Fact/source links must resolve to existing typed targets. More detailed validation rules are in [DATA_INVARIANTS.md](DATA_INVARIANTS.md).
 
 ## 8. Lookup and index strategy
 
-**Required uniqueness:** canonical PKs; `Season.year` within MLB namespace; active external `(provider, kind, value)`; `PlayerGameParticipation(game, player)`; non-null `PlateAppearance(game, game_pa_ordinal)`; `HomeRunEvent(plate_appearance)`; current `GameDataCoverage(game, domain)`; provider/source record identity where a stable key exists. Do **not** impose a unique `(teams, date)` game constraint.
+**Required uniqueness:** canonical PKs; `Season.year` within MLB namespace; active external `(provider, kind, value)`; `PlayerGameParticipation(game, player, team)`; non-null `PlateAppearance(game, game_pa_ordinal)`; `HomeRunEvent(plate_appearance)`; current `GameDataCoverage(game, domain)`; provider/source record identity where a stable key exists. Do **not** impose a unique `(teams, date)` game constraint.
 
 **Likely 0.1 indexes:** `Game(season, official_date, game_type)` and team/date access for home and away; `PlayerGameParticipation(player, game)` and `(team, game)`; `PlateAppearance(game, ordinal)`, `(batter, game)`, `(pitcher, game)`; HR lookup through PA by batter/game/date (consider a validated join/index or measured denormalization); affiliation `(player, effective_from_date)` and `(team, effective_from_date)`; source links by canonical target and by source; external IDs by provider/kind/value. The team matrix joins team games, participation, PA/HR events and coverage. League source queries traverse the same observations.
 
@@ -263,4 +263,4 @@ Source-record retention, change history/tombstones, retries, coverage-assessment
 
 ### Domain follow-ups
 
-Verify whether MLB franchise versus season-team identity requires separate canonical entities, whether name/league/division metadata needs temporal history, whether participation uniqueness `(game, player)` has exceptions, and whether coverage needs finer than game/domain scope. Decide from provider evidence and real 0.1 queries, not guesses.
+Verify whether MLB franchise versus season-team identity requires separate canonical entities, whether name/league/division metadata needs temporal history, whether game/domain coverage needs finer granularity. The `(game, player)` participation exception is verified and resolved above. Decide from provider evidence and real 0.1 queries, not guesses.
