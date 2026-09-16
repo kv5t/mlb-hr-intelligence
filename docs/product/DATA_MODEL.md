@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Canonical data model (0.0-B)
 
-**Status:** Conceptual architecture, not an ORM or SQL design. It specifies the minimum 0.1 domain shape. Names and fields below are canonical concepts; 0.0-D must verify provider mappings and authority, 0.0-C must define KPI eligibility and formulas, and 0.0-E must design ingestion/versioning. No endpoint or provider field has been verified here.
+**Status:** Conceptual 0.0-B architecture, not an ORM or SQL design. Names and fields below are canonical concepts. [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) resolve 0.0-C formulas and eligibility; 0.0-D must verify provider mappings and authority, and 0.0-E must design ingestion/versioning. No endpoint or provider field has been verified here.
 
 ## 1. Modeling principles and classification
 
@@ -67,7 +67,7 @@ There is **no** `Player.team`, `season_hr`, `last_30_hr`, `current_drought`, or 
 | --- | --- |
 | `id`, `player_id`, `team_id` (required) | One observed association interval. A player may have several intervals, including return to a team. |
 | `effective_from_date`, `effective_to_date_exclusive` (nullable) | Date-granularity interval bounds; a missing bound is unknown/open, not infinite certainty. |
-| `boundary_precision` (`DATE/INSTANT/UNKNOWN`, optional) | Records the precision of source-supported timing; any future instant bounds are UTC. |
+| `boundary_precision` (`DATE/UNKNOWN`, optional) | Records whether the date bounds are source-supported; no instant precision is claimed by date-only fields. |
 | `season_id` (nullable) | Optional season association for source scope; interval is not forced to one season. |
 | `affiliation_kind/status` (nullable) | Only a small verified canonical classification if needed; no invented provider roster states. |
 | provenance link(s) | Evidence for association and boundary changes. |
@@ -136,7 +136,7 @@ Each PA belongs to exactly one game and batter; a complete event set supports an
 | `batter_id`, `game_id` (via PA; optionally denormalized later only with validation) | Trace to player and contest without an independent, conflicting event identity. |
 | provenance link(s) | Evidence for the HR event and later source reconciliation. |
 
-**Chosen over PA outcome alone:** A distinct entity gives the HR log, matrix drill-down, provenance, and future Statcast matching a stable HR-specific target. PA outcome remains `HOME_RUN` for consistency. A PA cannot yield two batter HR events. A two-HR game has two distinct PAs and two `HomeRunEvent` rows in one `Game`; whether that is one recurrence occurrence belongs to 0.0-C. Tracking data attaches through a future event-link layer rather than columns on this entity. If a source asserts an HR but its PA cannot yet be reconciled, retain the source record as unresolved, mark event coverage incomplete, and do not fabricate a canonical PA or silently publish a verified HR.
+**Chosen over PA outcome alone:** A distinct entity gives the HR log, matrix drill-down, provenance, and future Statcast matching a stable HR-specific target. PA outcome remains `HOME_RUN` for consistency. A PA cannot yield two batter HR events. A two-HR game has two distinct PAs and two `HomeRunEvent` rows in one `Game`; 0.0-C defines it as one HR game for recurrence. Tracking data attaches through a future event-link layer rather than columns on this entity. If a source asserts an HR but its PA cannot yet be reconciled, retain the source record as unresolved, mark event coverage incomplete, and do not fabricate a canonical PA or silently publish a verified HR.
 
 ### GameDataCoverage — canonical coverage observation
 
@@ -249,9 +249,9 @@ The matching ADRs are in [DECISIONS.md](DECISIONS.md).
 
 ## 13. Unresolved questions and phase ownership
 
-### 0.0-C — KPI dictionary and product inclusion
+### 0.0-C — resolved in the KPI and window specifications
 
-Exact gap definition; multi-HR recurrence treatment; 7G/15G/30G/60G player/team/league membership; DNP, pinch-hit, zero-PA and traded-player window treatment; games-with-HR denominator; zero-HR PA/HR display; current/maximum drought unit and endpoints; streak behavior; doubleheader and suspended-game ordering/cutoffs; whether and how game types enter analytical views; sample-size thresholds. No such formula is decided here.
+The 0.0-B handoffs—gap definition, multi-HR recurrence, 7G/15G/30G/60G membership, DNP/pinch-hit/zero-PA/trade treatment, denominators, drought/streak behavior, doubleheader/suspension order, regular-season scope and sample-size display—are resolved in [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md). This data-model document itself remains formula-free.
 
 ### 0.0-D — provider verification and mapping
 

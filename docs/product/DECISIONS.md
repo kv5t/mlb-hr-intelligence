@@ -170,7 +170,7 @@
 - **Context:** Doubleheaders, postponements and suspended games cannot be identified by calendar date.
 - **Decision:** Use one immutable Game ID per contest, distinct game type/status/finality, official date, optional UTC scheduled/actual/completion instants, venue timezone, and a small `GameLifecycleEvent` history.
 - **Rationale:** Separate identity, baseball date, schedule and observed time preserve distinct contests and status changes.
-- **Consequences:** Same-day games remain separate; local display is derived. Game continuity and status mapping need provider verification in 0.0-D; window order belongs to 0.0-C.
+- **Consequences:** Same-day games remain separate; local display is derived. Game continuity and status mapping need provider verification in 0.0-D; window order is specified in 0.0-C.
 - **Revisit when:** Verified game identity/lifecycle behavior requires a different reconciliation or segment representation.
 
 ## ADR-020 — Explicit participation and completeness
@@ -199,3 +199,39 @@
 - **Rationale:** Reconciliation stays possible without making provider JSON the domain schema.
 - **Consequences:** Typed polymorphic targets require explicit domain validation and indexes. Authority, namespace/mapping and conflict policy remain 0.0-D; ingestion history remains 0.0-E.
 - **Revisit when:** Measured lookup cost or verified identifier behavior warrants typed per-entity storage.
+
+## ADR-023 — Regular-season-only MVP analytical scope
+
+- **Status:** Accepted for 0.0-C MVP definitions.
+- **Context:** Canonical storage distinguishes multiple game types, but mixed leaderboards would compare unlike competitions.
+- **Decision:** MVP 0.1 descriptive leaderboards, recurrence KPIs and default matrices include final `REGULAR` games only; other/unknown game types remain stored and navigable but outside these analytics.
+- **Rationale:** One explicit competition scope makes rates and recurrence comparable.
+- **Consequences:** Every KPI result carries season/game-type scope; provider game-type mapping still needs 0.0-D evidence.
+- **Revisit when:** A separately labeled postseason or other-type product view is specified and validated.
+
+## ADR-024 — Distinct team, player and matrix windows
+
+- **Status:** Accepted for 0.0-C MVP definitions.
+- **Context:** A team schedule and an individual player's batting opportunities differ, especially with DNP, zero PA and trades.
+- **Decision:** Team rolling N uses final regular-season team games; player rolling N uses games with verified appearance and ≥1 PA; team matrix columns use the shared team-game window. Apply team/home-away filters before last N. DNP and zero-PA appearances remain visible but outside player batting-game sequences.
+- **Rationale:** The selected opportunity unit is explicit for every display and denominator.
+- **Consequences:** `Player 30G` and `Matrix 30G` can cover different dates; labels and actual denominators must show that difference.
+- **Revisit when:** Research supports a separately named team-schedule-based player metric; do not silently change these IDs.
+
+## ADR-025 — HR-gap and multi-HR recurrence semantics
+
+- **Status:** Accepted for 0.0-C MVP definitions.
+- **Context:** HR event counts and HR-game spacing answer different questions.
+- **Decision:** One game with ≥1 HR contributes one recurrence HR game, though all its HR events count toward production. HR Gap is the number of eligible non-HR games strictly between consecutive HR games; adjacent HR games have gap 0.
+- **Rationale:** The recurrence unit is the game, while production retains event multiplicity.
+- **Consequences:** Gap summaries need at least two HR games, and labels must not call HR/Game recurrence.
+- **Revisit when:** A separately named interval-distance metric is requested; do not redefine HR Gap in place.
+
+## ADR-026 — Coverage gates and separate game/PA droughts
+
+- **Status:** Accepted for 0.0-C MVP definitions.
+- **Context:** Skipping an incomplete final game can fabricate a zero, gap or streak; PA and games are different opportunity units.
+- **Decision:** Select final candidate games before checking KPI coverage; incomplete/unknown evidence makes affected KPI nonnumeric rather than substituting an older complete game. Define game droughts for player/team and separate, secondary PA droughts for players. Current/maximum droughts include applicable scope edges; no-HR scope is annotated.
+- **Rationale:** Results remain reproducible and do not hide missing observations or mix denominators.
+- **Consequences:** Some windows display nonnumeric KPIs until data is repaired; request N, actual count, cutoff and coverage reason must be visible. API/UI representation is specified later.
+- **Revisit when:** Verified coverage and user research justify a separately named partial-data estimate; never relabel it as the complete KPI.

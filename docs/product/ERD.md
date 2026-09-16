@@ -74,6 +74,7 @@ erDiagram
         string event_kind
         datetime effective_at_utc "optional"
         datetime recorded_at_utc
+        datetime scheduled_start_at_utc "optional"
     }
     GAME_DATA_COVERAGE {
         uuid id PK
@@ -102,6 +103,7 @@ erDiagram
         int game_pa_ordinal "optional unique per game"
         string outcome_category
         string batter_side_used "optional"
+        string pitcher_hand_used "optional"
     }
     HOME_RUN_EVENT {
         uuid id PK

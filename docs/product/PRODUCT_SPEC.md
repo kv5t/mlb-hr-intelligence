@@ -45,7 +45,7 @@ The full screen inventory, routes, responsive behavior, and loading/partial/erro
 
 ## Scope and boundaries
 
-**0.1 HR Recurrence** covers seasons, all 30 franchises, players, schedule and completed games, HR events, PA where required, leaderboards, team/player/game pages, recurrence matrix and HR logs, 7G/15G/30G/60G/Season selections, CSV and PDF. Today is a simple daily overview. KPI candidates include HR, PA, HR/PA, PA/HR, HR/Game where meaningful, games with HR %, multi-HR games, gaps, droughts, and streaks. Their final definitions are reserved for 0.0-C.
+**0.1 HR Recurrence** covers seasons, all 30 franchises, players, schedule and completed games, HR events, PA where required, leaderboards, team/player/game pages, recurrence matrix and HR logs, 7G/15G/30G/60G/Season selections, CSV and PDF. Today is a simple daily overview. MVP analytical scope is regular-season games. HR, PA, HR/PA, PA/HR, HR/Game, Games With HR %, multi-HR games, gaps, droughts and streaks are defined in [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md).
 
 **Later:** 0.2 adds Statcast/contact and pitch analysis; 0.3 adds contextual Matchup Lab, park and weather; 0.4 adds explainable, validated ratings and probabilities. 1.0 covers production readiness. Elo is not presumed appropriate for rare HR events.
 
@@ -67,30 +67,17 @@ Cells carry numeric or textual meaning, never color alone. Use semantic tables w
 
 CSV and PDF are planned for 0.1. PDF may use A3 landscape with period/team header, KPI cards, recurrence matrix, legend, and descriptive analysis. Both export formats include the selected window, metric labels, and provenance/freshness where available. Exporting must use the same canonical definitions as the web view. No report generation is part of 0.0-A.
 
-## Open questions and ownership
+## Question closeout and remaining ownership
 
-The structural aspects of Q02, Q05-06, Q08-11, Q13, Q15 and Q18-19 are addressed in [DATA_MODEL.md](DATA_MODEL.md). The questions below retain their unresolved calculation, product inclusion or provider-mapping aspects. Product displays should use honest neutral labels or defer a metric until its meaning is fixed.
+Q01–Q12, Q14 and the product/metric portions of Q18–Q19 are resolved by [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md): HR gap counts intervening non-HR batting/team games; a multi-HR game is one recurrence game; player rolling windows use batting games; team matrix windows use team games; DNP and zero-PA appearances do not advance player batting-game droughts or break streaks; both game and player PA droughts are explicitly labeled. Filters precede last N, regular season is the MVP analytical type, and denominators are displayed. [KPI_TEST_CASES.md](KPI_TEST_CASES.md) supplies synthetic expected results.
 
-| ID | Question | Phase |
+| Question | Remaining issue | Owner |
 | --- | --- | --- |
-| Q01 | Is HR gap the count of completed relevant games between HR games, or the difference in HR-game indices? | 0.0-C |
-| Q02 | A multi-HR game has multiple HR events structurally; does it count as one recurrence occurrence? | 0.0-C |
-| Q03 | Is a player's 30G window based on team games, appearances, games with PA, or another set? | 0.0-C |
-| Q04 | Does a team game without player appearance extend that player's drought? | 0.0-C |
-| Q05 | How does a structurally represented pinch-hit-only appearance enter each KPI/window? | 0.0-C; source mapping 0.0-D |
-| Q06 | How does an explicitly represented zero-PA appearance enter each KPI/window? | 0.0-C; source mapping 0.0-D |
-| Q07 | Are current droughts expressed in games, PA, or both? | 0.0-C |
-| Q08 | Distinct doubleheader games are modeled; what is matrix/window ordering? | 0.0-C; source mapping 0.0-D |
-| Q09 | Postponement is modeled; how does it affect schedules/windows and source identity? | 0.0-C/D |
-| Q10 | One suspended/resumed contest is representable; what official-date/window rules and provider identity behavior apply? | 0.0-C/D |
-| Q11 | Affiliation and event team are historical; how do traded players enter team windows? | 0.0-C; source precision 0.0-D |
-| Q12 | Do league player windows follow appearances or team schedules? | 0.0-C |
-| Q13 | Player profile side and event-used side are distinct; how does the provider supply/map actual side? | 0.0-D |
-| Q14 | Which minimum sample-size indicators appear for each KPI/split? | 0.0-C |
-| Q15 | Explicit unknown/coverage states exist; what provider evidence sets them, and how does UI label partial coverage? | 0.0-D; UI contract 0.0-F/G |
-| Q16 | How are MLB/Statcast disagreements or unmatched events reconciled? | 0.0-D |
-| Q17 | Which provider is authoritative for each category, and what are coverage, latency, licensing and limits? | 0.0-D |
-| Q18 | Game types are structurally distinct; which enter product analytics (regular season, postseason, spring training, All-Star, other)? | 0.0-C scope; 0.0-D mapping |
-| Q19 | Official date, UTC starts/completion and venue timezone are distinct; which determines windows/display and how does provider data map? | 0.0-C window rules; 0.0-D mapping |
+| Q05–Q06, Q08–Q11 | Provider evidence for participation/PA, doubleheader ordering, reschedule/suspension identity and affiliation precision. | 0.0-D |
+| Q13 | Map actual switch-hitter side at PA level. | 0.0-D |
+| Q15 | Determine provider evidence for complete/partial coverage and present it in API/UI. | 0.0-D; 0.0-F/G |
+| Q16 | Reconcile MLB and Statcast disagreements/unmatched events. | 0.0-D |
+| Q17 | Determine provider authority, coverage, latency, limits and terms by category. | 0.0-D |
+| Q18–Q19 | Map provider game types, official dates, UTC instants and venue timezones. | 0.0-D |
 
-See [GLOSSARY.md](GLOSSARY.md) for provisional terminology and [ROADMAP.md](ROADMAP.md) for gates.
+See [GLOSSARY.md](GLOSSARY.md) for terminology and [ROADMAP.md](ROADMAP.md) for gates.

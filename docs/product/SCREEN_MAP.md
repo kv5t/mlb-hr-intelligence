@@ -1,10 +1,10 @@
 # MLB HR Intelligence — Screen map
 
-**Status:** Phase 0.0-A product inventory. Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. All KPIs are candidates whose formulas and denominators await 0.0-C. Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
+**Status:** Product inventory updated through 0.0-C. Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. MVP KPI formulas and denominators are in [KPI_SPEC.md](KPI_SPEC.md). Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
 
 ## Shared navigation and interaction rules
 
-Desktop primary: Today, League, Teams, Players, Games, Matchup, Explore. Social is secondary. Mobile primary: Today, League, Teams, Players, More (Games, Matchup, Explore, Social). Matchup and Explore entries appear only with their usable phase sections. Search can link directly to a player. Season/window/filter context should persist during drill-down where practical. A positive recurrence cell can navigate to game and HR event detail. CSV/PDF actions appear only on supported 0.1 analytical views and use shared analytics definitions.
+Desktop primary: Today, League, Teams, Players, Games, Matchup, Explore. Social is secondary. Mobile primary: Today, League, Teams, Players, More (Games, Matchup, Explore, Social). Matchup and Explore entries appear only with their usable phase sections. Search can link directly to a player. MVP leaderboards, recurrence KPIs and matrices analyze regular-season games only; schedule navigation may show other stored game types without merging them into these KPIs. Season/window/filter context should persist during drill-down where practical. A positive recurrence cell can navigate to game and HR event detail. CSV/PDF actions appear only on supported 0.1 analytical views and use shared analytics definitions.
 
 For each analytical screen, desktop presents dense controls and tables; tablet reduces default window/columns with horizontal access; mobile uses smaller default windows, filter sheets and touch targets without discarding underlying information. Text labels and numbers accompany color. Keyboard and screen-reader access apply to all controls, cells and drill-downs.
 
@@ -20,7 +20,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## League Leaderboard
 
 - **Purpose / route / phase:** Compare production separately from recurrence across MLB; `/league`; 0.1.
-- **Information / KPIs:** Player, team, HR, PA, HR/PA, PA/HR, Games With HR %, HR last 30, median HR gap, current drought. Production and recurrence are distinct views/column groups; never equate HR leader with recurrence leader.
+- **Information / KPIs:** Player, team, HR, PA, HR/PA, PA/HR, Games With HR %, Player HR — Last 30 Batting Games, median HR gap, Current HR Drought — Batting Games. Production and recurrence are distinct views/column groups; never equate HR leader with recurrence leader.
 - **Filters / actions / links:** Season; 7G/15G/30G/60G/Season; league, team, position, bat side, home/away where meaningful; sort, search, CSV/PDF; player/team details.
 - **Desktop / tablet / mobile:** Full sortable table with sticky identity / horizontally accessible columns / compact key columns, column chooser and filter sheet; all columns remain reachable.
 - **Loading / empty / partial / error:** Table skeleton / no eligible players for filters / show valid rows with missing KPI markers and sample sizes / retry data and preserve controls.
@@ -38,7 +38,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Team Detail
 
 - **Purpose / route / phase:** Team overview and hub; `/teams/:teamId`; 0.1.
-- **Information / KPIs:** Overview, Players, Games and HR Log sections; season HR, HR/Game, HR/PA, Games With HR %, last 30 HR, multi-HR games, current team HR streak/drought.
+- **Information / KPIs:** Overview, Players, Games and HR Log sections; season HR, Team HR/Team Game, HR/PA, Games With HR %, Team HR — Last 30 Team Games, multi-HR games, current team HR streak/drought.
 - **Filters / actions / links:** Season/window, home/away where meaningful; open Team Recurrence, player, game, HR event; export supported views.
 - **Desktop / tablet / mobile:** KPI grid and tabbed tables / stacked KPIs and scrollable tabs / compact KPIs and segmented navigation.
 - **Loading / empty / partial / error:** Header and panel skeleton / team has no eligible data / keep identity and valid panels with explicit missing panels / retry affected panel.
@@ -47,7 +47,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Team Recurrence
 
 - **Purpose / route / phase:** Interactive player-by-game HR matrix; `/teams/:teamId/recurrence`; 0.1.
-- **Information / KPIs:** Rows players, columns distinct games/dates, fixed Player/Season HR/Window HR; cell numeric HR count (0, 1, 2+); matrix legend and window totals. DNP, zero PA and game-status semantics await 0.0-B/C.
+- **Information / KPIs:** Rows players, columns distinct team games, fixed Player/Player Season HR (all teams)/Matrix Window HR (selected team games); cells distinguish HR count, known zero, DNP, zero-PA appearance, not-with-team, unknown and incomplete. 0.0-B defines structural states; [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) defines eligibility and display.
 - **Filters / actions / links:** 7G/15G/30G/60G/Season, all/home/away; sort rows, scroll games, open positive cell → game/event, open player, CSV/PDF.
 - **Desktop / tablet / mobile:** Sticky player/summary columns and horizontal reach to ~30 columns / shorter initial window with horizontal navigation / smallest initial window, sticky identity and touch-friendly cells; full information via scroll/export.
 - **Loading / empty / partial / error:** Matrix skeleton preserving headings / no eligible completed games / mark unknown cells and data freshness, never show unknown as 0 / retry matrix while keeping filters.
@@ -65,7 +65,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Player Detail
 
 - **Purpose / route / phase:** Player overview and navigation hub; `/players/:playerId`; 0.1.
-- **Information / KPIs:** Name, team, position, bat/throw side; overview with season HR, HR/PA, PA/HR, HR Games %, HR last 30, average/median gap, current/longest drought, current/longest streak, multi-HR games. Definitions await 0.0-C.
+- **Information / KPIs:** Name, team, position, bat/throw side; overview with season HR, HR/PA, PA/HR, Games With HR %, Player HR — Last 30 Batting Games, average/median gap, explicitly game- or PA-labeled current/maximum drought, current/maximum streak, multi-HR games. Definitions are in [KPI_SPEC.md](KPI_SPEC.md).
 - **Filters / actions / links:** Season/window; open Recurrence, Home Runs, team and game. Only available tabs appear; planned tabs are Overview, Recurrence, Home Runs, Splits, Statcast, Pitch Profile, Matchups.
 - **Desktop / tablet / mobile:** Header and KPI groups with tabs / stacked groups / compact identity and scrollable or segmented tabs.
 - **Loading / empty / partial / error:** Identity/KPI skeleton / no eligible season data / show known identity and explain unavailable metrics / retry panel.
@@ -74,7 +74,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Player Recurrence
 
 - **Purpose / route / phase:** Show chronological HR games and gap patterns; `/players/:playerId/recurrence`; 0.1.
-- **Information / KPIs:** Game strip with numeric HR counts; HR-game frequency, average/median gap, drought and streak candidates; gap distribution bands only after 0.0-C defines gaps.
+- **Information / KPIs:** Batting-game strip with numeric HR counts; HR-game frequency, average/median gap, game drought and streak; gap distribution counts non-HR batting games strictly between HR games.
 - **Filters / actions / links:** Season, 7G/15G/30G/60G/Season, home/away where meaningful; inspect game/event, export, return to overview.
 - **Desktop / tablet / mobile:** Wide timeline and distribution / shorter default timeline with scroll / compact scrollable strip and accessible detail list.
 - **Loading / empty / partial / error:** Timeline skeleton / no relevant games / unknown games shown distinctly from zero HR / retry timeline, preserve window.
@@ -101,11 +101,11 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Game Detail
 
 - **Purpose / route / phase:** Explain the game behind HR counts and matrix cells; `/games/:gameId`; 0.1.
-- **Information / KPIs:** Teams, score, status, lineups/pitchers where available, HR events with batter and game context. A completed game's HR count is observed; incomplete games must be labeled.
+- **Information / KPIs:** Teams, score, status, participants, batters and pitchers where available, and HR events with game context. A completed game's HR count requires complete HR-event coverage; incomplete data must be labeled.
 - **Filters / actions / links:** Event view/filter by team; open player, team, HR event/source detail when available; return to Games or matrix.
 - **Desktop / tablet / mobile:** Score header and parallel team/event panels / stacked panels / compact score and chronological events.
 - **Loading / empty / partial / error:** Game header skeleton / no HR events or no eligible game / show known score/status and flag unavailable lineup/event sections / retry affected section.
-- **Future:** 0.2 Statcast pitch and batted-ball details; 0.3 contextual matchup/weather; 0.4 labeled validated estimates.
+- **Future:** Starting-lineup detail if verified; 0.2 Statcast pitch and batted-ball details; 0.3 contextual matchup/weather; 0.4 labeled validated estimates.
 
 ## Matchup Lab
 

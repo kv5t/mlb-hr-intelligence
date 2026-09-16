@@ -18,6 +18,7 @@
 | R-01 | Every `PlayerTeamAffiliation` references an existing player and team; optional season scope, if set, references a season. | FKs. |
 | R-02 | If both affiliation bounds are known, `effective_from_date < effective_to_date_exclusive`. Unknown bounds and limited precision remain explicit. | Check/model validation. |
 | R-03 | A trade/return creates or corrects intervals without deleting earlier affiliation evidence. Overlap alone is not forbidden when dates are imprecise. | Ingestion validation/audit. |
+| R-07 | Date-only affiliation bounds can claim only `DATE` or `UNKNOWN` precision; game-specific team attribution comes from participation/PA. | Model validation. |
 | R-04 | Every participation and PA team is one of the game's two teams. `PA.batting_team_id` and `PA.fielding_team_id` differ. | Domain validation; FKs. |
 | R-05 | A game's player-team attribution comes from its observed participation/PA, not a current roster lookup. | Domain query test. |
 | R-06 | `PlayerGameParticipation` is unique by `(game, player)` for 0.1; a verified exception must trigger model review, not silent overwrite. | Unique key plus reconciliation. |
@@ -66,7 +67,8 @@
 | M-02 | An empty PA or HR set does not establish zero unless the matching coverage assessment is complete for the relevant scope. | Analytics precondition test. |
 | M-03 | Coverage state is explicit per game/domain; a current assessment is unique by `(game, domain)` and has an assessment time and provenance. Historical assessments are retained by 0.0-E policy. | Unique key/domain validation. |
 | M-04 | Player PA coverage and game HR-event coverage are independent; neither is inferred from game finality alone. | Domain validation/test. |
-| M-05 | A matrix cell may show numeric 0 only after 0.0-C defines eligibility and the relevant observation is known complete; otherwise it shows DNP/unknown/incomplete as defined later. | API/UI acceptance test. |
+| M-05 | A matrix cell shows `KNOWN_ZERO` only with complete required coverage and ≥1 player PA; DNP, zero PA, not-with-team, unknown and incomplete retain distinct states. | API/UI acceptance test. |
+| M-06 | A final regular-season game with incomplete required coverage stays in a selected team-game window; it cannot be skipped and replaced by an older complete game. The affected KPI is nonnumeric. | Window/analytics test. |
 
 ## External-ID and provenance invariants
 
@@ -94,6 +96,6 @@
 | 9 | Future Statcast enrichment | PASS | Tracking layer can link to PA/HR event without adding tracking columns to core HR. |
 | 10 | MLB/Statcast disagree | PASS | Both source references and conflicting fact links survive reconciliation. |
 | 11 | Incomplete event import | PASS | Coverage `PARTIAL/UNKNOWN` blocks interpreting absent HR events as zero. |
-| 12 | League/Team A/Team B/full-season query | PASS | Stable player, temporal affiliation, game-specific team and scoped events support each view; window rules await 0.0-C. |
+| 12 | League/Team A/Team B/full-season query | PASS | Stable player, temporal affiliation, game-specific team and scoped events support each view; window rules are in `WINDOW_SEMANTICS.md`. |
 
 **PASS means structurally representable**, not that provider behavior, KPI rules or implementation has been verified.
