@@ -4,10 +4,10 @@
 
 | Term | Product meaning and boundary | Pending |
 | --- | --- | --- |
-| HR | Home run credited to a batter; a production count. | Source/event authority 0.0-D. |
-| PA | Canonical plate appearance, used as an opportunity denominator where appropriate. | Source mapping 0.0-D. |
-| HR/Game | HR divided by eligible player batting games or team games respectively; a **production rate**, never recurrence. | Formula in KPI_SPEC; source mapping 0.0-D. |
-| HR/PA | HR divided by canonical PA in the same scope; undefined at zero PA. | Formula in KPI_SPEC; source mapping 0.0-D. |
+| HR | Home run credited to a batter; a production count. | Sampled source mapping documented; completeness validation remains open. |
+| PA | Canonical plate appearance, used as an opportunity denominator where appropriate. | Sampled source mapping documented; implementation validation remains open. |
+| HR/Game | HR divided by eligible player batting games or team games respectively; a **production rate**, never recurrence. | Formula in KPI_SPEC; sampled source mapping documented; implementation validation open. |
+| HR/PA | HR divided by canonical PA in the same scope; undefined at zero PA. | Formula in KPI_SPEC; sampled source mapping documented; implementation validation open. |
 | PA/HR | Canonical PA divided by HR in the same scope; `NULL(NO_HOME_RUNS_IN_SCOPE)` at zero HR, never infinity. | Formula in KPI_SPEC. |
 | Games With HR | Count of eligible subject games with ≥1 HR. | Formula in KPI_SPEC. |
 | Games With HR % | 100 times HR games divided by eligible subject games; recurrence frequency. | Formula in KPI_SPEC. |
@@ -23,24 +23,24 @@
 | Maximum HR Streak | Longest HR-game run inside selected scope. | Formula in KPI_SPEC. |
 | Production | Count or rate of HR output and opportunities, including HR/Game, HR/PA and PA/HR. | MVP formulas in KPI_SPEC. |
 | Recurrence | Pattern of HR games: frequency, gaps, droughts and streaks; never a synonym for HR/Game. | MVP formulas in KPI_SPEC. |
-| Contact Quality | Tracked characteristics of batted balls, such as exit velocity, barrels and launch angle; primarily 0.2. | Source definitions 0.0-D; later KPI specification. |
-| Context | Conditions/dimensions for interpretation: handedness, pitch type/velocity, park, weather, wind, roof. Not itself a prediction. | Sources 0.0-D; later phase details. |
-| Observed Statistic | Count or reported measurement tied to actual events, such as HR total or measured exit velocity. | Provenance/coverage 0.0-D. |
+| Contact Quality | Tracked characteristics of batted balls, such as exit velocity, barrels and launch angle; primarily 0.2. | Sampled source fields documented; later KPI specification. |
+| Context | Conditions/dimensions for interpretation: handedness, pitch type/velocity, park, weather, wind, roof. Not itself a prediction. | Candidate sources evaluated; later phase selection and validation. |
+| Observed Statistic | Count or reported measurement tied to actual events, such as HR total or measured exit velocity. | Provider evidence documented; coverage validation open. |
 | Derived Metric | Reproducible calculation from canonical data, such as HR/PA or median HR gap. | MVP formulas in KPI_SPEC. |
 | Rating | A modeled or composite assessment, distinct from observed facts; deferred to 0.4 and requires validation. | Model design 0.4. |
 | Prediction | Estimate of a future/unknown outcome, such as HR probability; deferred to 0.4. | Evaluation/calibration 0.4. |
 | Window | Explicit bounded set of selected subject opportunities; required coverage gates numeric results. | Semantics in WINDOW_SEMANTICS. |
 | Season Window | All selected regular-season subject games through cutoff. | Semantics in WINDOW_SEMANTICS. |
 | Game Window | Last N team games or player batting games (7G/15G/30G/60G), selected after filters. | Semantics in WINDOW_SEMANTICS. |
-| Plate Appearance | Canonical batter opportunity in one game, distinct from at-bat, with stable internal identity. | Source mapping 0.0-D. |
-| Game | Distinct MLB contest with immutable internal identity; doubleheaders stay separate and a suspended/resumed contest can stay one game. | Provider identity mapping 0.0-D. |
-| Game Type | Canonical category for regular, postseason, spring, All-Star and other/unknown. MVP analytics include regular season only. | Provider mapping 0.0-D. |
-| Player-Team Affiliation | Date-granularity sourced historical association; actual game team is recorded with participation/PA. | Source precision 0.0-D. |
-| Player Game Participation | Assessed `APPEARED`, `DID_NOT_APPEAR` or `UNKNOWN`; no row is unassessed. Zero-PA appearance is not a batting game. | Source mapping 0.0-D. |
-| Data Coverage | Explicit complete, partial, unknown or unavailable assessment for a game/domain or a player's PA set. Empty events alone do not prove zero. | Provider evidence 0.0-D; update policy 0.0-E. |
-| Home Run Event | Distinct canonical observation linked 1:1 to one HR-producing PA, which supplies player, game and team; carries source provenance and can later link to tracking data. | Source matching 0.0-D. |
-| Provider | External source of facts or context, accessed through an adapter and verified before relying on its fields. | Verification 0.0-D. |
-| Source Data | Provider-reported record/field retained with provenance, before or alongside normalization. | Provider mapping 0.0-D; storage/update policy 0.0-E. |
+| Plate Appearance | Canonical batter opportunity in one game, distinct from at-bat, with stable internal identity. | Sampled source mapping documented; implementation validation remains open. |
+| Game | Distinct MLB contest with immutable internal identity; doubleheaders stay separate and a suspended/resumed contest can stay one game. | Sampled identity behavior documented; broader validation open. |
+| Game Type | Canonical category for regular, postseason, spring, All-Star and other/unknown. MVP analytics include regular season only. | Sampled mapping documented; broader validation open. |
+| Player-Team Affiliation | Date-granularity sourced historical association; actual game team is recorded with participation/PA. | Temporal-boundary evidence remains open. |
+| Player Game Participation | Assessed `APPEARED`, `DID_NOT_APPEAR` or `UNKNOWN`; no row is unassessed. Zero-PA appearance is not a batting game. | Sampled source mapping documented; implementation validation remains open. |
+| Data Coverage | Explicit complete, partial, unknown or unavailable assessment for a game/domain or a player's PA set. Empty events alone do not prove zero. | Provider evidence and coverage policy documented; implementation validation open. |
+| Home Run Event | Distinct canonical observation linked 1:1 to one HR-producing PA, which supplies player, game and team; carries source provenance and can later link to tracking data. | Sampled matching documented; broader validation open. |
+| Provider | External source of facts or context, accessed through an adapter and verified before relying on its fields. | Sampled verification documented; access approval open. |
+| Source Data | Provider-reported record/field retained with provenance, before or alongside normalization. | Sampled provider mapping and 0.0-E storage/update policy documented; implementation validation open. |
 | Canonical Data | Normalized, validated domain representation independent of a particular provider schema, with separately preserved external IDs. | Conceptual model 0.0-B; implementation later. |
 | Derived Data | Stored or computed result of a reproducible transformation of canonical data; not source observation or model output. | MVP formulas in KPI_SPEC; persistence/versioning 0.0-E. |
 

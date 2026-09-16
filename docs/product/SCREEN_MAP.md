@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Screen map
 
-**Status:** Product inventory updated through 0.0-C. Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. MVP KPI formulas and denominators are in [KPI_SPEC.md](KPI_SPEC.md). Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
+**Status:** Product inventory aligned through 0.0-F; route names are UI concepts, with public API contracts in [API_CONTRACT.md](API_CONTRACT.md). Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. MVP KPI formulas and denominators are in [KPI_SPEC.md](KPI_SPEC.md). Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
 
 ## Shared navigation and interaction rules
 
@@ -38,7 +38,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Team Detail
 
 - **Purpose / route / phase:** Team overview and hub; `/teams/:teamId`; 0.1.
-- **Information / KPIs:** Overview, Players, Games and HR Log sections; season HR, Team HR/Team Game, HR/PA, Games With HR %, Team HR — Last 30 Team Games, multi-HR games, current team HR streak/drought.
+- **Information / KPIs:** Overview, Players, Games and HR Log sections; season HR, Team HR/Team Game, HR/PA, Games With HR %, Team HR — Last 30 Team Games, multi-HR games, current team HR streak/drought, which may extend before the displayed N-game window.
 - **Filters / actions / links:** Season/window, home/away where meaningful; open Team Recurrence, player, game, HR event; export supported views.
 - **Desktop / tablet / mobile:** KPI grid and tabbed tables / stacked KPIs and scrollable tabs / compact KPIs and segmented navigation.
 - **Loading / empty / partial / error:** Header and panel skeleton / team has no eligible data / keep identity and valid panels with explicit missing panels / retry affected panel.
@@ -47,7 +47,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Team Recurrence
 
 - **Purpose / route / phase:** Interactive player-by-game HR matrix; `/teams/:teamId/recurrence`; 0.1.
-- **Information / KPIs:** Rows players, columns distinct team games, fixed Player/Player Season HR (all teams)/Matrix Window HR (selected team games); cells distinguish HR count, known zero, DNP, zero-PA appearance, not-with-team, unknown and incomplete. 0.0-B defines structural states; [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) defines eligibility and display.
+- **Information / KPIs:** Rows players, columns distinct team games, fixed Player/Player Season HR (all teams)/Matrix Window HR (selected team games); cells distinguish HR count, known zero, DNP, zero-PA appearance, not-with-team, unknown and incomplete. DNP and not-with-team require affirmative evidence; otherwise the cell is unknown. 0.0-B defines structural states; [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) defines eligibility and display.
 - **Filters / actions / links:** 7G/15G/30G/60G/Season, all/home/away; sort rows, scroll games, open positive cell → game/event, open player, CSV/PDF.
 - **Desktop / tablet / mobile:** Sticky player/summary columns and horizontal reach to ~30 columns / shorter initial window with horizontal navigation / smallest initial window, sticky identity and touch-friendly cells; full information via scroll/export.
 - **Loading / empty / partial / error:** Matrix skeleton preserving headings / no eligible completed games / mark unknown cells and data freshness, never show unknown as 0 / retry matrix while keeping filters.
@@ -84,7 +84,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 
 - **Purpose / route / phase:** Event-level evidence behind counts; `/players/:playerId/home-runs`; 0.1.
 - **Information / KPIs:** Date, opponent, home/away, pitcher when available, game and HR event; count of events in selected window.
-- **Filters / actions / links:** Season/window, opponent/home-away; sort, open game/event, CSV, return to player.
+- **Filters / actions / links:** Season/window and home/away; sort, open game/event, CSV, return to player. An opponent analytical filter needs an explicit future window rule before it can be offered.
 - **Desktop / tablet / mobile:** Event table / horizontally accessible table / event cards with same fields in detail.
 - **Loading / empty / partial / error:** Event placeholders / no HR events in selected scope / mark missing pitcher or source details / retry event list.
 - **Future:** 0.2 exit velocity, launch angle, distance, pitch type/velocity if verified and matched; 0.3 context.

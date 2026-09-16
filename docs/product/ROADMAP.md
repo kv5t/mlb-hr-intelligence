@@ -1,11 +1,11 @@
 # MLB HR Intelligence — Roadmap and phase gates
 
-**Status:** Updated through Phase 0.0-D. Current phase: 0.0-E (architecture only; provider access and coverage launch gates remain open). A phase is complete only when its exit criteria are met. Later features are not implicitly authorized by completion of an earlier phase.
+**Status:** Updated through Phase 0.0-E (specification complete). Current phase: 0.0-F; provider access and coverage launch gates remain open. A phase is complete only when its exit criteria are met. Later features are not implicitly authorized by completion of an earlier phase.
 
 ## 0.0 — Product and data specification
 
 - **Objective / user value:** Establish coherent product, statistical, data, provider and implementation contracts before code; users eventually see trustworthy and consistent metrics.
-- **In scope:** 0.0-A product scope/screen map; 0.0-B canonical data model; 0.0-C KPI dictionary/formulas; 0.0-D provider verification/mapping; 0.0-E ingestion architecture (current phase); 0.0-F DRF API contracts; 0.0-G frontend architecture; 0.0-H final 0.1 backlog.
+- **In scope:** 0.0-A product scope/screen map; 0.0-B canonical data model; 0.0-C KPI dictionary/formulas; 0.0-D provider verification/mapping; 0.0-E ingestion architecture; 0.0-F DRF API contracts (current phase); 0.0-G frontend architecture; 0.0-H final 0.1 backlog.
 - **Out of scope:** Application code, provider integrations, fabricated data, reports, predictive models, and unverified endpoint claims.
 - **Dependencies:** Existing product concept and stack decisions. B/C/D must resolve the recorded open questions before their dependent contracts are finalized.
 - **Deliverables:** Versioned specifications, provider evidence and mappings, architecture contracts, implementation backlog. 0.0-A delivered five product documents; 0.0-B added the canonical model, ERD and invariants; 0.0-C defines KPIs, windows and synthetic acceptance cases.

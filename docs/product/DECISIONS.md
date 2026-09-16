@@ -101,32 +101,32 @@
 - **Consequences:** 0.0-B defines canonical entities; 0.0-D verifies fields, authority, reconciliation and mapping; 0.0-E designs ingestion.
 - **Revisit when:** A verified source or domain requirement exposes an insufficient boundary.
 
-## ADR-012 — Planned MLB core source
+## ADR-012 — MLB core source candidate with access gate
 
-- **Status:** Planned; unverified.
+- **Status:** Verified with limitations for 0.1 source feasibility; automated use remains externally access-gated.
 - **Context:** 0.1 needs teams, players, seasons, schedules, games, PA and HR events.
-- **Decision:** Evaluate MLB Stats API as the planned core provider.
-- **Rationale:** It is the nominated source for core MLB categories, subject to evidence.
-- **Consequences:** No endpoint, schema, coverage, rate limit, terms or data authority is assumed; 0.0-D must verify before integration.
-- **Revisit when:** 0.0-D finds unsuitable coverage, reliability or licensing.
+- **Decision:** Use sampled MLB first-party public responses as the core mapping candidate. Keep canonical internal IDs and require validated PA/HR coverage before numeric publication.
+- **Rationale:** 0.0-D/E verified representative identity, schedule and event behavior, including a non-PA play inside `allPlays`.
+- **Consequences:** No formal Stats API support/rate guarantee or production reuse authorization was established. G06 completeness validation and G12 `PROVIDER_ACCESS_APPROVED` remain open. Public API contracts do not grant provider access.
+- **Revisit when:** Broader coverage validation or external access review changes feasibility.
 
-## ADR-013 — Planned advanced tracking source
+## ADR-013 — Baseball Savant/Statcast future candidate
 
-- **Status:** Planned; unverified.
+- **Status:** Verified with limitations for future 0.2 feasibility; not in 0.1 API.
 - **Context:** 0.2 needs event-level contact and pitch tracking.
-- **Decision:** Evaluate Baseball Savant/Statcast as the planned advanced provider. pybaseball, if used, remains behind our adapter and never defines the canonical domain.
-- **Rationale:** It is the nominated source for future tracking analysis, pending verification and reconciliation.
-- **Consequences:** Event matching, field definitions, provenance and usage conditions belong to 0.0-D; no 0.1 Statcast claim.
-- **Revisit when:** Verification shows unavailable or unsuitable data or terms.
+- **Decision:** Retain Baseball Savant/Statcast as a future tracking candidate behind our adapter. pybaseball is optional tooling, never a canonical authority.
+- **Rationale:** First-party CSV schema and five same-game HR links were sampled; general PA linkage, coverage and access conditions remain open.
+- **Consequences:** No 0.1 Statcast fields/endpoints; 0.2 must validate broader matching and permitted use.
+- **Revisit when:** Future evidence or terms change feasibility.
 
-## ADR-014 — Weather and park providers deferred
+## ADR-014 — Weather and park provider selection deferred
 
-- **Status:** Planned; deferred.
+- **Status:** Candidate evaluation complete for 0.0-D; final 0.3 architecture deferred.
 - **Context:** 0.3 matchup context may need forecast/historical weather and park characteristics.
-- **Decision:** Select a weather provider (WeatherAPI or another verified option) in 0.0-D; verify Baseball Savant/Statcast park-factor availability and other park facts before use. Implement contextual analysis in 0.3.
-- **Rationale:** Availability, provenance, latency, limits and licensing are not established in 0.0-A.
-- **Consequences:** No weather, wind or park intelligence in 0.1; roof and field orientation must inform any later wind interpretation.
-- **Revisit when:** 0.0-D evidence changes provider choice or available context.
+- **Decision:** WeatherAPI, Open-Meteo, MLB game weather and Baseball Savant park factors are researched candidates, not a selected production weather/park architecture. Selection, licensing, historical suitability and context modeling belong to 0.3.
+- **Rationale:** Forecast and multi-season historical needs differ; candidate access, coverage and cost do not establish a final design.
+- **Consequences:** No weather, wind or park intelligence in 0.1; later wind interpretation needs roof and field orientation evidence.
+- **Revisit when:** 0.3 validates provider access and historical/game context.
 
 ## ADR-015 — Descriptive analytics precede models
 
@@ -282,3 +282,10 @@
 
 - **Status:** Accepted for 0.0-E.
 - **Decision:** Every accepted canonical/coverage change advances a monotonic dataset revision with durable invalidation intent. Web/CSV/PDF pin one revision; MVP recomputes on demand or invalidates revision-keyed caches.
+
+## ADR-035 — Public API date cutoff and current revision token
+
+- **Status:** Accepted for 0.0-F MVP 0.1 contract.
+- **Decision:** Public analytics accept an inclusive official `cutoff=YYYY-MM-DD`, with omitted cutoff resolved and returned as a latest official date. Game-ID cutoff remains an internal semantic option, not a 0.1 public filter. Every analytical response/export reads one consistent current `DatasetRevision`; the token is response metadata, not a historical snapshot selector.
+- **Rationale:** Date cutoff includes all same-day games and avoids mixing date and game-order meanings. Revision metadata prevents mixed-response results without promising historical version storage.
+- **Consequences:** Explicit filters plus revision/as-of make results interpretable; corrected later data may change numbers at the same cutoff. A future historical-revision API requires versioned storage and a separate contract.
