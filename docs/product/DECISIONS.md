@@ -254,3 +254,31 @@
 - **Decision:** Keep internal canonical PKs; add unique nullable verified MLB ID lookup columns on Player, Team, Venue and Game, plus generic typed `ExternalIdentifier` for aliases and secondary providers. Enforce consistency between any duplicated MLB alias and core key.
 - **Rationale:** The observed gamePk/player/team/venue IDs are frequent join and retrieval keys. Direct unique indexes and FKs on canonical entities simplify SQLite lookup and remain portable to PostgreSQL. Typed aliases preserve cross-provider linkage. The cost is explicit MLB coupling in nullable lookup fields, without making a provider ID the canonical identity.
 - **Evidence:** [PROVIDER_EVIDENCE.md](PROVIDER_EVIDENCE.md).
+
+## ADR-030 — External provider access gate
+
+- **Status:** Accepted for 0.0-E architecture; actual approval is OPEN_EXTERNAL.
+- **Decision:** Automated fetch/backfill requires externally recorded `PROVIDER_ACCESS_APPROVED` covering provider, operation and scope. Research samples and HTTP success do not set approval.
+- **Consequence:** Default deny; no automated provider integration is deployable until external rights/access review.
+
+## ADR-031 — Immutable source snapshots and game-level atomic publication
+
+- **Status:** Accepted for 0.0-E architecture.
+- **Decision:** Store safe metadata in DB and compressed SHA-256-addressed immutable response bytes before normalization; publish one game/coverage revision atomically. Retain source links, conflicts and correction history.
+- **Rationale:** Deterministic replay and failure isolation without putting large raw feeds into SQLite query tables.
+
+## ADR-032 — Single-writer sync and conservative coverage proof
+
+- **Status:** Accepted for 0.0-E MVP design.
+- **Decision:** Use conceptual Django management commands with one external scheduler, database target leases, one SQLite writer and bounded game transactions. `COMPLETE` PA/HR requires event-level plus per-batter/team boxscore reconciliation. No assumed rate limit or automatic zero from Final/HTTP 200.
+- **Revisit when:** Measured throughput or reliability requires distributed work/PostgreSQL.
+
+## ADR-033 — Graceful matrix degradation and temporal affiliation evidence
+
+- **Status:** Accepted for 0.0-E.
+- **Decision:** DNP and NOT_WITH_TEAM display only with affirmative evidence; otherwise UNKNOWN. One game appearance never creates a continuous affiliation interval. G03/G05 are matrix feature-fidelity gaps, while G06 is a hard analytics correctness gate.
+
+## ADR-034 — Revision-keyed analytics consistency
+
+- **Status:** Accepted for 0.0-E.
+- **Decision:** Every accepted canonical/coverage change advances a monotonic dataset revision with durable invalidation intent. Web/CSV/PDF pin one revision; MVP recomputes on demand or invalidates revision-keyed caches.

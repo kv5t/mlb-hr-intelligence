@@ -1,6 +1,6 @@
 # Provider strategy — Phase 0.0-D
 
-**Status: BLOCKED for unconditional 0.1 launch.** The sampled MLB public responses support game identity, schedule, event-level PA/HR representation and many metadata fields. They do **not yet prove** reliable affirmative `DID_NOT_APPEAR`, complete PA/HR coverage for every game, historical affiliation boundaries, or production reuse rights. Source details: [evidence](PROVIDER_EVIDENCE.md), [field mapping](PROVIDER_FIELD_MAPPING.md), [gaps](PROVIDER_GAPS.md).
+**Status: BLOCKED for unconditional 0.1 launch.** The sampled MLB public responses support game identity, schedule, event-level PA/HR representation and many metadata fields. They do **not yet prove** reliable affirmative `DID_NOT_APPEAR`, complete PA/HR coverage for every game, historical affiliation boundaries, or production reuse rights. G03/G05 reduce matrix fidelity to `UNKNOWN` where necessary; G06 blocks numeric analytics without completeness; G12 blocks automated production access. Source details: [evidence](PROVIDER_EVIDENCE.md), [field mapping](PROVIDER_FIELD_MAPPING.md), [gaps](PROVIDER_GAPS.md).
 
 ## Authority by category
 
@@ -23,7 +23,7 @@
 
 ## Critical decisions
 
-1. **MVP 0.1:** MLB core is a plausible source for contest, player, PA, HR and scores, but complete matrix semantics are blocked by DNP, affiliation and coverage verification. Product can show `UNKNOWN` cells where evidence is insufficient, yet a fully populated reliable DNP/not-with-team matrix cannot be claimed. 0.0-E must define assessments and validation fixtures before implementing publication.
+1. **MVP 0.1:** MLB core is a plausible source for contest, player, PA, HR and scores, but fully populated DNP/NOT_WITH_TEAM matrix states are limited by DNP and affiliation evidence; coverage G06 blocks affected numeric analytics. Product can show `UNKNOWN` cells where evidence is insufficient, yet a fully populated reliable DNP/not-with-team matrix cannot be claimed. 0.0-E defines assessments in [COVERAGE_POLICY.md](COVERAGE_POLICY.md) and fixtures in [INGESTION_TEST_CASES.md](INGESTION_TEST_CASES.md); implementation validation remains open.
 2. **PA and HR:** `allPlays[]` at-bat play objects include walks and HBP and expose `atBatIndex`; `result.eventType=home_run` maps to that play. Sampled HR events map 1:1 to PAs. A 76-play/75-boxscore-PA sample prevents declaring universal completeness from raw play count alone.
 3. **Lifecycle:** `gamePk` stayed stable in sampled reschedule and suspension. Doubleheader contests had distinct IDs and game numbers. Original official date stayed on a suspended contest; resumed date appeared separately. Ingestion snapshots are needed to preserve prior schedule states. These examples do not prove every historical edge case.
 4. **Identity:** The same player can represent both teams in one resumed contest. Participation key is `(game, player, team)`; one unfiltered player batting-game counts that contest once if any qualifying PA. Team-filtered values use PAs attributed to represented team. Verified MLB IDs are high-frequency lookup columns alongside generic aliases; internal UUIDs remain canonical PKs.
@@ -37,13 +37,13 @@
 | Baseball Savant CSV/search and park factors | First-party web/download surfaces; no credential used for page reading. | No production rate limit or licensing grant verified. | **LEGAL/TERMS REVIEW REQUIRED**; row-level downloads and redistribution require review. |
 | pybaseball | Open-source wrapper; provider conditions still apply. | Package price does not grant provider data rights. | Optional convenience only; direct provider schema is preferred for authoritative adapter/reconciliation. |
 | WeatherAPI | API key required. | [Pricing](https://www.weatherapi.com/pricing.aspx): Free $0, 100K/month and 1 historical day; Starter $7/month, 3M/month and 7 historical days; Pro+ $25/month and 365 days; Business $65/month and history since 2010. Verify checkout/current plan before purchase. | Forecast/current use plausible within ~$10/month; historical training beyond one week is **not** within Starter. [Terms](https://www.weatherapi.com/terms.aspx) require Free attribution; storage/redistribution review. Historical product says archived forecasts, not necessarily actual observations. |
-| Open-Meteo | Free endpoint for noncommercial use; commercial plan required. | [Pricing](https://open-meteo.com/en/pricing) and [historical docs](https://open-meteo.com/en/docs/historical-weather-api) describe hourly modeled/reanalysis history since 1940. Production plan/price fit requires selection. | Credible historical alternative but free use is not a general commercial license; station/ballpark representativeness needs validation. |
+| Open-Meteo | Free/Open-Access endpoint for evaluation/noncommercial use; commercial access requires subscription/customer endpoint. | [Pricing](https://open-meteo.com/en/pricing) and [historical docs](https://open-meteo.com/en/docs/historical-weather-api) describe hourly modeled/reanalysis history since 1940. Commercial Historical Weather API requires Professional or higher per E19; plan/price fit requires selection. | Credible historical alternative but free use is not a general commercial license; station/ballpark representativeness needs validation. |
 
 **Future weather split:** live/future matchup conditions need forecasts at a venue/time. Model training needs historical hourly observations or defensible reanalysis across many seasons. MLB weather is coarse recorded game context; WeatherAPI Starter history horizon is too short for multi-season training. No historical provider is selected for production modeling yet.
 
-## Handoff to 0.0-E
+## 0.0-E architecture handoff
 
-Design snapshotting and idempotent reconciliation for gamePk, status and schedule; PA/boxscore reconciliation with explicit exceptions; affirmative participation population rules; coverage states that support known zeros; backfill/correction cadence; and data-rights review gate. Do not infer completeness from `Final`, an empty HR list, or a successful HTTP response. No production integration was added in this phase.
+The 0.0-E documents now specify snapshotting, idempotent gamePk reconciliation, PA/boxscore exceptions, participation and coverage proof, backfill/correction cadence and the external access gate. Implementation validation remains open. `Final`, an empty HR list and HTTP success are never completeness proofs. No production integration was added.
 
 ## 0.0-D quality gate audit
 
@@ -87,4 +87,6 @@ Design snapshotting and idempotent reconciliation for gamePk, status and schedul
 | 34 | Every gap has owner/severity/blocker | PASS: PROVIDER_GAPS. |
 | 35 | No production integration code | PASS: Markdown documentation only. |
 
-**Phase result: BLOCKED** under the user’s gate because G03/G05/G06/G12 are unresolved 0.1 launch gates. The research and documents are complete enough to hand these explicit decisions to 0.0-E, but this is not a green light for implementation or release.
+**Phase result: BLOCKED** under the user’s gate because G06 and G12 are hard 0.1 gates; G03/G05 are feature-fidelity degradations. The research and documents are complete enough to hand these explicit decisions to 0.0-E, but this is not a green light for implementation or release.
+
+**0.0-E access gate:** `PROVIDER_ACCESS_APPROVED` must be externally recorded before any automated production or season backfill use. Public HTTP success is not that approval.

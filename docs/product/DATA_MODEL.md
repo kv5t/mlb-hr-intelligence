@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Canonical data model (0.0-B)
 
-**Status:** Conceptual 0.0-B architecture, not an ORM or SQL design. Names and fields below are canonical concepts. [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) resolve 0.0-C formulas and eligibility; 0.0-D provider findings are recorded in [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md) and [PROVIDER_FIELD_MAPPING.md](PROVIDER_FIELD_MAPPING.md); 0.0-E designs ingestion/versioning. This document remains conceptual.
+**Status:** Conceptual 0.0-B architecture, not an ORM or SQL design. Names and fields below are canonical concepts. [KPI_SPEC.md](KPI_SPEC.md) and [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) resolve 0.0-C formulas and eligibility; 0.0-D provider findings are recorded in [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md) and [PROVIDER_FIELD_MAPPING.md](PROVIDER_FIELD_MAPPING.md); 0.0-E ingestion/versioning are specified in [INGESTION_ARCHITECTURE.md](INGESTION_ARCHITECTURE.md) and companion policies. This document remains conceptual.
 
 ## 1. Modeling principles and classification
 
@@ -72,7 +72,7 @@ There is **no** `Player.team`, `season_hr`, `last_30_hr`, `current_drought`, or 
 | `affiliation_kind/status` (nullable) | Only a small verified canonical classification if needed; no invented provider roster states. |
 | provenance link(s) | Evidence for association and boundary changes. |
 
-Intervals may overlap when sources or date precision cannot establish a unique same-day ordering. An interval is historical association evidence, **not** proof of appearance in every team game. Actual team represented is attached to `PlayerGameParticipation` and `PlateAppearance`. No historical interval is overwritten by a trade.
+Intervals may overlap when sources or date precision cannot establish a unique same-day ordering. An interval requires verified temporal roster/transaction or equivalent dated evidence; a single game appearance cannot create a continuous interval. An interval is historical association evidence, **not** proof of appearance in every team game. Actual team represented is attached to `PlayerGameParticipation` and `PlateAppearance`. No historical interval is overwritten by a trade.
 
 ### Game — canonical identity plus current contest snapshot
 
@@ -88,7 +88,7 @@ Intervals may overlap when sources or date precision cannot establish a unique s
 | `scheduled_game_number` (nullable) | Source-supported doubleheader/order hint, not identity. |
 | `home_score`, `away_score` (nullable) | Observed score if available; unknown remains null. |
 
-`Game.id` identifies one contest. `official_date` and `scheduled_game_number` support display/order but are never unique identity. External game IDs attach through `ExternalIdentifier`. A reschedule or suspension should update the same contest when reconciliation establishes continuity; 0.0-D must verify provider ID behavior. Ambiguous identity is quarantined for reconciliation rather than merged by date/teams alone.
+`Game.id` identifies one contest. `official_date` and `scheduled_game_number` support display/order but are never unique identity. External game IDs attach through `ExternalIdentifier`. A reschedule or suspension should update the same contest when reconciliation establishes continuity; sampled provider identity behavior is in [PROVIDER_EVIDENCE.md](PROVIDER_EVIDENCE.md). Ambiguous identity is quarantined for reconciliation rather than merged by date/teams alone.
 
 ### GameLifecycleEvent — canonical observation of schedule/status history
 

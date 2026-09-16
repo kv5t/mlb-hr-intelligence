@@ -53,9 +53,9 @@ The full screen inventory, routes, responsive behavior, and loading/partial/erro
 
 ## Traceability and provider strategy
 
-Planned flow: external provider → adapter → normalization/validation → canonical domain data → analytics/aggregation → DRF → React, PDF, CSV. MLB Stats API is the **planned** core source for schedule, games, players, teams, PA and HR events. Baseball Savant/Statcast is the **planned** advanced tracking source, potentially accessed through tooling behind our adapter. A weather provider is deferred to 0.0-D selection; weather becomes relevant in 0.3. Park-factor availability and provenance also require verification. No endpoint, field, coverage, licensing, or provider authority has been verified in 0.0-A.
+Planned flow: external provider → adapter → normalization/validation → canonical domain data → analytics/aggregation → DRF → React, PDF, CSV. Sampled MLB public responses support schedule, game, player, team, PA and HR representation, subject to the coverage and access gates in [PROVIDER_GAPS.md](PROVIDER_GAPS.md). Baseball Savant/Statcast is a verified future tracking candidate with limited event-linkage evidence; weather and park context remain later-phase work. Public response access does **not** authorize automated production collection, storage or republication. See [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md).
 
-The intended drill-down is player → matrix cell → game → plate appearance → HR event → source. Later a reconciled Statcast event can attach to an HR event. Missing or conflicting provider data must be visible as incomplete/provisional rather than silently substituted; the exact authority and reconciliation rules are open for 0.0-D.
+The intended drill-down is player → matrix cell → game → plate appearance → HR event → source. Later a reconciled Statcast event can attach to an HR event. Missing or conflicting provider data must be visible as incomplete/provisional rather than silently substituted; authority and reconciliation rules are in [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md) and [RECONCILIATION_POLICY.md](RECONCILIATION_POLICY.md).
 
 ## Responsive and accessible behavior
 

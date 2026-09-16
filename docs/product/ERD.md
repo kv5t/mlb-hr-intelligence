@@ -115,7 +115,7 @@ erDiagram
     }
 ```
 
-`Team` has two distinct roles in `Game`. `PlateAppearance` likewise has batting and fielding team roles and a nullable pitcher reference. `PlayerGameParticipation` rows are unique by `(game, player, team)` and express assessed states; their absence means unassessed. `GameDataCoverage` is a current assessment per game/domain, with assessment history handled by the future ingestion design. `HomeRunEvent` obtains batter, game and team through its one PA, avoiding competing references.
+`PlayerTeamAffiliation` is created only from dated temporal association evidence; a single game appearance does not establish its interval. `Team` has two distinct roles in `Game`. `PlateAppearance` likewise has batting and fielding team roles and a nullable pitcher reference. `PlayerGameParticipation` rows are unique by `(game, player, team)` and express assessed states; their absence means unassessed. `GameDataCoverage` is a current assessment per game/domain, with assessment history handled by the future ingestion design. `HomeRunEvent` obtains batter, game and team through its one PA, avoiding competing references.
 
 ## Supporting/provenance references
 
@@ -154,7 +154,7 @@ erDiagram
     }
 ```
 
-`ExternalIdentifier.canonical_entity_id` and `FactSourceLink.canonical_entity_id` are **typed references** to an existing core entity, not ordinary FKs to every entity shown in the primary diagram. Their target integrity requires domain/ingestion validation; the diagram deliberately avoids false direct FK claims. A canonical fact can have multiple source links and a source record can support several facts. Provider authority and reconciliation remain 0.0-D.
+`ExternalIdentifier.canonical_entity_id` and `FactSourceLink.canonical_entity_id` are **typed references** to an existing core entity, not ordinary FKs to every entity shown in the primary diagram. Their target integrity requires domain/ingestion validation; the diagram deliberately avoids false direct FK claims. A canonical fact can have multiple source links and a source record can support several facts. Provider authority is in PROVIDER_STRATEGY; ingestion reconciliation is specified in RECONCILIATION_POLICY and INGESTION_ARCHITECTURE.
 
 ## Future extensions outside the core ERD
 

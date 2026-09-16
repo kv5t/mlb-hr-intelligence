@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Product glossary
 
-**Status:** Terminology updated through 0.0-C. [DATA_MODEL.md](DATA_MODEL.md) defines structures; [KPI_SPEC.md](KPI_SPEC.md) defines formulas; [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) defines eligibility, windows and cutoff. Remaining provider mapping/authority belongs to 0.0-D and ingestion/update behavior to 0.0-E.
+**Status:** Terminology updated through 0.0-E. [DATA_MODEL.md](DATA_MODEL.md) defines structures; [KPI_SPEC.md](KPI_SPEC.md) defines formulas; [WINDOW_SEMANTICS.md](WINDOW_SEMANTICS.md) defines eligibility, windows and cutoff. Sampled provider mapping and authority are in [PROVIDER_STRATEGY.md](PROVIDER_STRATEGY.md) and [PROVIDER_FIELD_MAPPING.md](PROVIDER_FIELD_MAPPING.md); open gaps are in [PROVIDER_GAPS.md](PROVIDER_GAPS.md). Ingestion/update behavior is specified in [INGESTION_ARCHITECTURE.md](INGESTION_ARCHITECTURE.md), [COVERAGE_POLICY.md](COVERAGE_POLICY.md) and companion 0.0-E documents.
 
 | Term | Product meaning and boundary | Pending |
 | --- | --- | --- |
@@ -45,3 +45,12 @@
 | Derived Data | Stored or computed result of a reproducible transformation of canonical data; not source observation or model output. | MVP formulas in KPI_SPEC; persistence/versioning 0.0-E. |
 
 Displayed labels must identify subject (player/team), season/window and opportunity unit where ambiguity matters. A missing value is distinct from zero.
+
+## 0.0-E operational terms
+
+| Term | Definition | Owner |
+| --- | --- | --- |
+| Provider access approved | Externally recorded authorization covering a provider and automated operation; public response access does not set this gate. | INGESTION_ARCHITECTURE. |
+| Raw source snapshot | Immutable retrieved response bytes plus safe retrieval metadata, retained for replay and audit. | SOURCE_SNAPSHOT_POLICY. |
+| Analytics-ready domain | A game/domain with required complete coverage and resolved membership; distinct from game finality. | COVERAGE_POLICY. |
+| Dataset revision | Monotonic committed version of canonical facts/coverage pinned by web, CSV and PDF. | INGESTION_ARCHITECTURE. |

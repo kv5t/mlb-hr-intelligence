@@ -18,6 +18,7 @@
 | R-01 | Every `PlayerTeamAffiliation` references an existing player and team; optional season scope, if set, references a season. | FKs. |
 | R-02 | If both affiliation bounds are known, `effective_from_date < effective_to_date_exclusive`. Unknown bounds and limited precision remain explicit. | Check/model validation. |
 | R-03 | A trade/return creates or corrects intervals without deleting earlier affiliation evidence. Overlap alone is not forbidden when dates are imprecise. | Ingestion validation/audit. |
+| R-08 | A game-specific appearance, boxscore team or PA team must not by itself create a continuous affiliation interval or a `NOT_WITH_TEAM` assertion. | Ingestion validation. |
 | R-07 | Date-only affiliation bounds can claim only `DATE` or `UNKNOWN` precision; game-specific team attribution comes from participation/PA. | Model validation. |
 | R-04 | Every participation and PA team is one of the game's two teams. `PA.batting_team_id` and `PA.fielding_team_id` differ. | Domain validation; FKs. |
 | R-05 | A game's player-team attribution comes from its observed participation/PA, not a current roster lookup. | Domain query test. |
