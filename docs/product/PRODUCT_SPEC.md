@@ -12,7 +12,7 @@ The original manually generated PDF is a **UX reference only**. Its example stat
 
 - **0.1, descriptive:** Who has the most HR? Who has HR in the largest share of relevant games? Who has the shortest median HR gap, a current drought, a streak, or clustered multi-HR games? Which games and HR events support a displayed count?
 - **0.2, contact quality:** Which hitters have strong recent tracked contact, and how do pitch type, pitch velocity, and handedness splits change the observed profile?
-- **0.3, matchup context:** How do a batter, pitcher arsenal, park, roof, and weather relate to a specific matchup? Which observed factors favor or oppose HR production?
+- **0.3, matchup context:** Which observed batter, pitcher, park and weather factors characterize the matchup, and how do they compare with historical outcomes?
 - **0.4, validated models:** What is an estimated HR probability, what inputs explain it, and how well was it calibrated on held-out historical data?
 
 ## Product principles
@@ -22,7 +22,7 @@ The original manually generated PDF is a **UX reference only**. Its example stat
 3. **Label knowledge type.** Distinguish observed statistics, derived metrics, context, and model outputs in labels and visual treatment. A rating or probability is never presented as an observed statistic.
 4. **Do not invent precision.** Surface denominators, sample size, missing data, provisional status, and uncertainty where relevant. Statistical definitions remain open until 0.0-C.
 5. **One analytics definition across outputs.** React, DRF, CSV, and PDF consume the same canonical analytics layer; a report must not silently recompute a KPI differently.
-6. **Keep providers at the boundary.** Provider adapters normalize and validate into canonical domain data. Preserve authoritative external IDs for traceability; provider field names do not dictate domain models. Exact fields belong to 0.0-B and mappings and authority to 0.0-D.
+6. **Keep providers at the boundary.** Provider adapters normalize and validate into canonical domain data. Preserve external IDs for traceability; provider field names do not dictate domain models. Exact fields belong to 0.0-B and mappings and authority to 0.0-D.
 7. **Descriptive before predictive.** No arbitrary scores, Elo-like HR ratings, or probability claims in 0.1. Models need historical validation, calibration, sample-size and uncertainty communication in 0.4.
 8. **Core analytics stand alone.** Social embeds are auxiliary and cannot block core screens, analytics APIs, or exports.
 
@@ -55,7 +55,7 @@ The full screen inventory, routes, responsive behavior, and loading/partial/erro
 
 Planned flow: external provider → adapter → normalization/validation → canonical domain data → analytics/aggregation → DRF → React, PDF, CSV. MLB Stats API is the **planned** core source for schedule, games, players, teams, PA and HR events. Baseball Savant/Statcast is the **planned** advanced tracking source, potentially accessed through tooling behind our adapter. A weather provider is deferred to 0.0-D selection; weather becomes relevant in 0.3. Park-factor availability and provenance also require verification. No endpoint, field, coverage, licensing, or provider authority has been verified in 0.0-A.
 
-The intended drill-down is player → matrix cell → game → HR event → source. Later a reconciled Statcast event can attach to an HR event. Missing or conflicting provider data must be visible as incomplete/provisional rather than silently substituted; the exact authority and reconciliation rules are open for 0.0-D.
+The intended drill-down is player → matrix cell → game → plate appearance → HR event → source. Later a reconciled Statcast event can attach to an HR event. Missing or conflicting provider data must be visible as incomplete/provisional rather than silently substituted; the exact authority and reconciliation rules are open for 0.0-D.
 
 ## Responsive and accessible behavior
 
@@ -69,26 +69,28 @@ CSV and PDF are planned for 0.1. PDF may use A3 landscape with period/team heade
 
 ## Open questions and ownership
 
-These are deliberately unresolved. Product displays should use honest neutral labels or defer a metric until its meaning is fixed.
+The structural aspects of Q02, Q05-06, Q08-11, Q13, Q15 and Q18-19 are addressed in [DATA_MODEL.md](DATA_MODEL.md). The questions below retain their unresolved calculation, product inclusion or provider-mapping aspects. Product displays should use honest neutral labels or defer a metric until its meaning is fixed.
 
 | ID | Question | Phase |
 | --- | --- | --- |
 | Q01 | Is HR gap the count of completed relevant games between HR games, or the difference in HR-game indices? | 0.0-C |
-| Q02 | Does a multi-HR game yield one recurrence event while retaining multiple production events? | 0.0-C |
+| Q02 | A multi-HR game has multiple HR events structurally; does it count as one recurrence occurrence? | 0.0-C |
 | Q03 | Is a player's 30G window based on team games, appearances, games with PA, or another set? | 0.0-C |
 | Q04 | Does a team game without player appearance extend that player's drought? | 0.0-C |
-| Q05 | How does a pinch-hit-only appearance count? | 0.0-B/C |
-| Q06 | How is an appearance with zero official PA represented and counted? | 0.0-B/C |
+| Q05 | How does a structurally represented pinch-hit-only appearance enter each KPI/window? | 0.0-C; source mapping 0.0-D |
+| Q06 | How does an explicitly represented zero-PA appearance enter each KPI/window? | 0.0-C; source mapping 0.0-D |
 | Q07 | Are current droughts expressed in games, PA, or both? | 0.0-C |
-| Q08 | How do doubleheader games map to distinct matrix columns and ordering? | 0.0-B/C |
-| Q09 | How are postponed games represented in schedules and windows? | 0.0-B/C |
-| Q10 | How are suspended/resumed games dated and counted? | 0.0-B/C |
-| Q11 | How do traded players appear in team windows and historical affiliation? | 0.0-B/C |
+| Q08 | Distinct doubleheader games are modeled; what is matrix/window ordering? | 0.0-C; source mapping 0.0-D |
+| Q09 | Postponement is modeled; how does it affect schedules/windows and source identity? | 0.0-C/D |
+| Q10 | One suspended/resumed contest is representable; what official-date/window rules and provider identity behavior apply? | 0.0-C/D |
+| Q11 | Affiliation and event team are historical; how do traded players enter team windows? | 0.0-C; source precision 0.0-D |
 | Q12 | Do league player windows follow appearances or team schedules? | 0.0-C |
-| Q13 | How is switch-hitter side represented for event-level splits? | 0.0-B |
+| Q13 | Player profile side and event-used side are distinct; how does the provider supply/map actual side? | 0.0-D |
 | Q14 | Which minimum sample-size indicators appear for each KPI/split? | 0.0-C |
-| Q15 | How are missing provider fields/events represented in canonical data and UI? | 0.0-B/D |
+| Q15 | Explicit unknown/coverage states exist; what provider evidence sets them, and how does UI label partial coverage? | 0.0-D; UI contract 0.0-F/G |
 | Q16 | How are MLB/Statcast disagreements or unmatched events reconciled? | 0.0-D |
 | Q17 | Which provider is authoritative for each category, and what are coverage, latency, licensing and limits? | 0.0-D |
+| Q18 | Game types are structurally distinct; which enter product analytics (regular season, postseason, spring training, All-Star, other)? | 0.0-C scope; 0.0-D mapping |
+| Q19 | Official date, UTC starts/completion and venue timezone are distinct; which determines windows/display and how does provider data map? | 0.0-C window rules; 0.0-D mapping |
 
 See [GLOSSARY.md](GLOSSARY.md) for provisional terminology and [ROADMAP.md](ROADMAP.md) for gates.

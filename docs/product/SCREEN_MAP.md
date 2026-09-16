@@ -137,7 +137,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Django Administration
 
 - **Purpose / route / phase:** Staff inspection and configuration; `/admin/`; 0.1 initial data inspection, extended with each relevant phase. Not part of consumer primary navigation.
-- **Information / KPIs:** Seasons, teams, players, games, venues, provider records, sync runs/errors/raw imports; later X sources, settings and feature flags. Provider-owned MLB stats are imported read-only authoritative data, not manually editable facts.
+- **Information / KPIs:** Seasons, teams, players, games, venues, provider records, sync runs/errors/raw imports; later X sources, settings and feature flags. Provider records are imported, generally read-only source records; data authority by category is determined during 0.0-D.
 - **Filters / actions / links:** Staff search/filter and permitted configuration; inspect provenance and sync status; link to relevant public entity where appropriate.
 - **Desktop / tablet / mobile:** Standard admin tables/forms / responsive admin layouts / essential inspection and configuration, with horizontal access for dense tables.
 - **Loading / empty / partial / error:** Admin loading feedback / no records yet / show available records and import errors / explicit failure and retry for read actions.

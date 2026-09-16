@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Architecture decision log
 
-**Status key:** Accepted = current architectural choice, not implemented in 0.0-A. Planned = intended source/feature awaiting verification or later phase. Each decision can be revisited when its stated condition occurs. No provider endpoint or capability is claimed verified here.
+**Status key:** Accepted = current architectural choice, not necessarily implemented. Planned = intended source/feature awaiting verification or later phase. Each decision can be revisited when its stated condition occurs. No provider endpoint or capability is claimed verified here.
 
 ## ADR-001 — Python and Django 5.2 backend
 
@@ -87,7 +87,7 @@
 
 - **Status:** Accepted.
 - **Context:** Staff need to inspect imported entities, providers and sync health and later manage X sources/settings.
-- **Decision:** Use Django Admin. Treat provider-owned MLB statistics as imported, generally read-only authoritative facts.
+- **Decision:** Use Django Admin. Treat provider-owned MLB statistics as imported, generally read-only source records. Data authority by category is determined during Phase 0.0-D.
 - **Rationale:** A conventional staff interface limits bespoke admin work and protects source integrity.
 - **Consequences:** Permissions, auditability and exact admin representations require later design.
 - **Revisit when:** Staff workflows require a dedicated interface.
@@ -154,3 +154,48 @@
 - **Rationale:** Core analytics must remain reliable regardless of third-party embed behavior.
 - **Consequences:** Separate loading/error states and no data dependency from social to analytics. Release timing is independent, no earlier than planned 0.3 work.
 - **Revisit when:** Product demand, embed terms or availability warrant a different auxiliary design.
+
+## ADR-018 — Stable identities and temporal player-team affiliation
+
+- **Status:** Accepted for 0.0-B conceptual model.
+- **Context:** Trades, returns and metadata changes must not rewrite historical team views.
+- **Decision:** Give Player and Team immutable internal identities; represent historical association with `PlayerTeamAffiliation` intervals and record represented team on each game participation/PA. Do not use a sole `Player.team` field.
+- **Rationale:** An interval captures membership history while a game observation identifies the team for an actual event even when boundary dates are imprecise.
+- **Consequences:** Current team is a temporal query; overlaps/unknown interval bounds need reconciliation. Metrics using affiliation require 0.0-C rules.
+- **Revisit when:** Verified provider data shows franchise/season-team distinctions or participation exceptions requiring more identity structure.
+
+## ADR-019 — Contest identity, lifecycle and UTC time
+
+- **Status:** Accepted for 0.0-B conceptual model.
+- **Context:** Doubleheaders, postponements and suspended games cannot be identified by calendar date.
+- **Decision:** Use one immutable Game ID per contest, distinct game type/status/finality, official date, optional UTC scheduled/actual/completion instants, venue timezone, and a small `GameLifecycleEvent` history.
+- **Rationale:** Separate identity, baseball date, schedule and observed time preserve distinct contests and status changes.
+- **Consequences:** Same-day games remain separate; local display is derived. Game continuity and status mapping need provider verification in 0.0-D; window order belongs to 0.0-C.
+- **Revisit when:** Verified game identity/lifecycle behavior requires a different reconciliation or segment representation.
+
+## ADR-020 — Explicit participation and completeness
+
+- **Status:** Accepted for 0.0-B conceptual model.
+- **Context:** DNP, zero-PA appearance and incomplete source coverage cannot share one zero value.
+- **Decision:** Use `PlayerGameParticipation` with `APPEARED/DID_NOT_APPEAR/UNKNOWN`, separate player PA coverage, and `GameDataCoverage` by game/domain. No row means unassessed.
+- **Rationale:** Known zero and missing observations remain distinguishable for later recurrence calculations.
+- **Consequences:** DNP needs affirmative evidence; final game status does not prove event coverage. Drought/window effects remain 0.0-C.
+- **Revisit when:** Provider coverage requires finer assessment scope or participation cases exceed the 0.1 model.
+
+## ADR-021 — PA opportunity and separate HR event
+
+- **Status:** Accepted for 0.0-B conceptual model.
+- **Context:** HR logs, matrix drill-down and future tracking matching need event-specific identity while PA is the opportunity unit.
+- **Decision:** Represent each PA as a canonical opportunity and each credited batter HR as a separate `HomeRunEvent` linked 1:1 to an HR-producing PA. Keep event-specific batting side separate from player profile side.
+- **Rationale:** A distinct HR target supports provenance, enrichment and multi-HR games without storing aggregates on Player.
+- **Consequences:** Outcome/event consistency must be validated; two HR in a game require two PAs. Provider PA ordering and matching await 0.0-D.
+- **Revisit when:** Verified source representation cannot support the required PA/event linkage without a documented alternate observation layer.
+
+## ADR-022 — Typed external identifiers and fact provenance
+
+- **Status:** Accepted for 0.0-B conceptual model.
+- **Context:** Multiple providers may name the same player/game differently or disagree on a fact.
+- **Decision:** Use provider-namespaced, entity-typed `ExternalIdentifier` references and separate `SourceRecordReference`/`FactSourceLink` evidence. Canonical IDs do not embed provider IDs; multiple source links may support or conflict with a fact.
+- **Rationale:** Reconciliation stays possible without making provider JSON the domain schema.
+- **Consequences:** Typed polymorphic targets require explicit domain validation and indexes. Authority, namespace/mapping and conflict policy remain 0.0-D; ingestion history remains 0.0-E.
+- **Revisit when:** Measured lookup cost or verified identifier behavior warrants typed per-entity storage.

@@ -1,6 +1,6 @@
 # MLB HR Intelligence — Product glossary
 
-**Status:** Phase 0.0-A terminology. Definitions describe product meaning, not finalized computation. **0.0-C** must specify eligible games/PA, denominators, window boundaries, null behavior, and formulas before implementation; **0.0-B** defines entities and event representation.
+**Status:** Product terminology updated through 0.0-B. Definitions describe product meaning, not finalized computation. [DATA_MODEL.md](DATA_MODEL.md) defines the structural entities; **0.0-C** must specify eligible games/PA, denominators, windows, null behavior, and formulas.
 
 | Term | Product meaning and boundary | Pending |
 | --- | --- | --- |
@@ -30,14 +30,18 @@
 | Rating | A modeled or composite assessment, distinct from observed facts; deferred to 0.4 and requires validation. | Model design 0.4. |
 | Prediction | Estimate of a future/unknown outcome, such as HR probability; deferred to 0.4. | Evaluation/calibration 0.4. |
 | Window | Explicit bounded set of relevant opportunities used for a display/calculation. | Membership/cutoff 0.0-C. |
-| Season Window | Selected season's eligible observations through a stated cutoff. | Season and cutoff rules 0.0-B/C. |
+| Season Window | Selected season's eligible observations through a stated cutoff. | Membership/cutoff rules 0.0-C. |
 | Game Window | Last N eligible games (7G/15G/30G/60G) for a specified subject. | Player/team eligibility 0.0-C. |
-| Plate Appearance | Batter opportunity recorded in a game; may differ from at-bat. | Canonical representation and edge cases 0.0-B/C. |
-| Game | Distinct MLB contest with identifiers, teams, schedule/status and relevant events; doubleheaders and suspended games need explicit identity/date rules. | 0.0-B/C/D. |
-| Home Run Event | Event supporting one HR count and linking player, game, source, and later tracking data where matched. | 0.0-B/D. |
+| Plate Appearance | Canonical batter opportunity recorded in one game; may differ from at-bat and has its own stable internal identity. | Eligibility/edge-case KPI rules 0.0-C; provider mapping 0.0-D. |
+| Game | Distinct MLB contest with an immutable internal identity; doubleheader contests remain separate and a suspended/resumed contest can remain one game. Official date differs from UTC start/completion and local display date. | Window/order rules 0.0-C; provider identity mapping 0.0-D. |
+| Game Type | Canonical category distinguishing regular season, postseason, spring training, All-Star and other/unknown. | Product inclusion 0.0-C; provider mapping 0.0-D. |
+| Player-Team Affiliation | Sourced temporal association between stable player and team identities; actual game team is recorded with participation/PA. | Source precision 0.0-D; window treatment 0.0-C. |
+| Player Game Participation | Assessed `APPEARED`, `DID_NOT_APPEAR`, or `UNKNOWN` state for a player and game; no row means unassessed. An appearance may have zero PA. | Eligibility effects 0.0-C; source mapping 0.0-D. |
+| Data Coverage | Explicit complete, partial, unknown or unavailable assessment for a game/domain or a player's PA set. Empty events alone do not prove zero. | Provider evidence 0.0-D; update policy 0.0-E. |
+| Home Run Event | Distinct canonical observation linked 1:1 to one HR-producing PA, which supplies player, game and team; carries source provenance and can later link to tracking data. | Source matching 0.0-D. |
 | Provider | External source of facts or context, accessed through an adapter and verified before relying on its fields. | Verification 0.0-D. |
-| Source Data | Provider-reported record/field retained with provenance, before or alongside normalization. | Storage and mapping 0.0-B/D. |
-| Canonical Data | Normalized, validated domain representation independent of a particular provider schema, with preserved external IDs. | Schema 0.0-B. |
+| Source Data | Provider-reported record/field retained with provenance, before or alongside normalization. | Provider mapping 0.0-D; storage/update policy 0.0-E. |
+| Canonical Data | Normalized, validated domain representation independent of a particular provider schema, with separately preserved external IDs. | Conceptual model 0.0-B; implementation later. |
 | Derived Data | Stored or computed result of a reproducible transformation of canonical data; not source observation or model output. | Formula/versioning 0.0-C/E. |
 
 Displayed labels must identify subject (player/team), season/window and opportunity unit where ambiguity matters. A missing value is distinct from zero.
