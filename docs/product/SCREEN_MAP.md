@@ -1,10 +1,10 @@
 # MLB HR Intelligence — Screen map
 
-**Status:** Product inventory aligned through 0.0-F; route names are UI concepts, with public API contracts in [API_CONTRACT.md](API_CONTRACT.md). Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. MVP KPI formulas and denominators are in [KPI_SPEC.md](KPI_SPEC.md). Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
+**Status:** Product inventory aligned through 0.0-G; route names are UI concepts, with public API contracts in [API_CONTRACT.md](API_CONTRACT.md). Routes are suggested UI paths, not API contracts. A screen's introduction phase is the first phase with usable content; future sections remain hidden or explicitly unavailable until shipped. MVP KPI formulas and denominators are in [KPI_SPEC.md](KPI_SPEC.md). Every screen uses visible loading, empty, partial-data, and error messaging with retry where appropriate; missing values are never silently converted to zero.
 
 ## Shared navigation and interaction rules
 
-Desktop primary: Today, League, Teams, Players, Games, Matchup, Explore. Social is secondary. Mobile primary: Today, League, Teams, Players, More (Games, Matchup, Explore, Social). Matchup and Explore entries appear only with their usable phase sections. Search can link directly to a player. MVP leaderboards, recurrence KPIs and matrices analyze regular-season games only; schedule navigation may show other stored game types without merging them into these KPIs. Season/window/filter context should persist during drill-down where practical. A positive recurrence cell can navigate to game and HR event detail. CSV/PDF actions appear only on supported 0.1 analytical views and use shared analytics definitions.
+Desktop primary: Today, League, Teams, Players, Games, Matchup, Explore. Social is secondary. Mobile primary: Today, League, Teams, Players, More (Games, Matchup, Explore, Social). Matchup and Explore may appear as visibly unavailable future destinations until their usable phases; they have no working 0.1 routes. Search can link directly to a player. MVP leaderboards, recurrence KPIs and matrices analyze regular-season games only; schedule navigation may show other stored game types without merging them into these KPIs. Season/window/filter context should persist during drill-down where practical. A positive recurrence cell can navigate to game and HR event detail. CSV/PDF actions appear only on supported 0.1 analytical views and use shared analytics definitions.
 
 For each analytical screen, desktop presents dense controls and tables; tablet reduces default window/columns with horizontal access; mobile uses smaller default windows, filter sheets and touch targets without discarding underlying information. Text labels and numbers accompany color. Keyboard and screen-reader access apply to all controls, cells and drill-downs.
 
@@ -21,7 +21,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 
 - **Purpose / route / phase:** Compare production separately from recurrence across MLB; `/league`; 0.1.
 - **Information / KPIs:** Player, team, HR, PA, HR/PA, PA/HR, Games With HR %, Player HR — Last 30 Batting Games, median HR gap, Current HR Drought — Batting Games. Production and recurrence are distinct views/column groups; never equate HR leader with recurrence leader.
-- **Filters / actions / links:** Season; 7G/15G/30G/60G/Season; league, team, position, bat side, home/away where meaningful; sort, search, CSV/PDF; player/team details.
+- **Filters / actions / links:** Season; 7G/15G/30G/60G/Season; team, position, bat side, home/away where meaningful; sort, search, CSV/PDF; player/team details.
 - **Desktop / tablet / mobile:** Full sortable table with sticky identity / horizontally accessible columns / compact key columns, column chooser and filter sheet; all columns remain reachable.
 - **Loading / empty / partial / error:** Table skeleton / no eligible players for filters / show valid rows with missing KPI markers and sample sizes / retry data and preserve controls.
 - **Future:** 0.2 observed Statcast columns; 0.4 model outputs only in a separate labeled view.
@@ -30,7 +30,7 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 
 - **Purpose / route / phase:** Discover all 30 MLB franchises; `/teams`; 0.1.
 - **Information / KPIs:** Team identity and descriptive season HR, HR/Game, Games With HR % when defined.
-- **Filters / actions / links:** Season, league/division and search; sort, open Team Detail; link from League/Today.
+- **Filters / actions / links:** Season, sourced league/division browsing metadata where available, and search; sort, open Team Detail; link from League/Today.
 - **Desktop / tablet / mobile:** Grid or summary table / two-column cards / single-column cards.
 - **Loading / empty / partial / error:** Team placeholders / no matching team / show identities while stats are unavailable / retry list or stats separately.
 - **Future:** 0.2 contact quality; 0.3 park context; 0.4 separate validated intelligence.
@@ -56,8 +56,8 @@ For each analytical screen, desktop presents dense controls and tables; tablet r
 ## Players
 
 - **Purpose / route / phase:** Find and compare players; `/players`; 0.1.
-- **Information / KPIs:** Identity, team, position, bat side, HR, PA and selected production/recurrence columns.
-- **Filters / actions / links:** Universal/player search, team, position, bat side, season/window, sort; open Player Detail and League.
+- **Information / KPIs:** Player identity/search/discovery comes from `GET /api/v1/players/`; comparative HR, PA and rolling production/recurrence columns come from `GET /api/v1/leaderboards/players/` when shown. `/players/` does not own rolling analytics.
+- **Filters / actions / links:** Universal/player search, team, position, bat side and season for discovery; window/cutoff and metric sorting apply to the composed leaderboard view. Open Player Detail and League.
 - **Desktop / tablet / mobile:** Sortable table / reduced visible columns with access to rest / search-first list, filter sheet and compact stats.
 - **Loading / empty / partial / error:** Search/list placeholders / no match / keep identity and flag missing stats / retry preserving query.
 - **Future:** 0.2 contact/pitch filters; 0.3 contextual splits; 0.4 separately labeled model insights.
