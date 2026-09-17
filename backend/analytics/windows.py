@@ -14,6 +14,7 @@ from domain.models import (
     PlateAppearance,
     Player,
     PlayerGameParticipation,
+    PlayerTeamAffiliation,
     Season,
     Team,
 )
@@ -311,13 +312,10 @@ def _finish(
     if unknown_date_ids or relevant_uncertain or resolved_cutoff is None:
         known_order_groups = _unverified_groups(known_games)
         membership = (
-            MembershipState.INCOMPLETE
-            if not unknown_date_ids
-            and relevant_uncertain
-            and any(
-                state == MembershipState.INCOMPLETE for _, state in relevant_uncertain
-            )
-            else MembershipState.UNKNOWN
+            MembershipState.UNKNOWN
+            if unknown_date_ids
+            or any(state == MembershipState.UNKNOWN for _, state in relevant_uncertain)
+            else MembershipState.INCOMPLETE
         )
         return SelectionResult(
             subject_kind,
@@ -562,12 +560,27 @@ def _player_game_evidence(
         )
     if possible_states:
         state = (
-            MembershipState.INCOMPLETE
-            if MembershipState.INCOMPLETE in possible_states
-            else MembershipState.UNKNOWN
+            MembershipState.UNKNOWN
+            if MembershipState.UNKNOWN in possible_states
+            else MembershipState.INCOMPLETE
         )
         return None, state
     return None, None
+
+
+def _affiliation_may_cover(affiliation: PlayerTeamAffiliation, game: Game) -> bool:
+    """Only precise date bounds may exclude a game for this affiliation's team."""
+    if game.official_date is None:
+        return True
+    if affiliation.boundary_precision != PlayerTeamAffiliation.BoundaryPrecision.DATE:
+        return True
+    return (
+        affiliation.effective_from_date is None
+        or affiliation.effective_from_date <= game.official_date
+    ) and (
+        affiliation.effective_to_date_exclusive is None
+        or game.official_date < affiliation.effective_to_date_exclusive
+    )
 
 
 def select_player_window(
@@ -630,6 +643,37 @@ def select_player_window(
         )
     }
 
+    if team is None:
+        affiliations = list(
+            PlayerTeamAffiliation.objects.filter(player=player).filter(
+                Q(season=season) | Q(season__isnull=True)
+            )
+        )
+        observed_teams: dict[UUID, set[UUID]] = defaultdict(set)
+        for game_id, team_id in participation_rows:
+            observed_teams[game_id].add(team_id)
+        for game_id, team_id in pa_rows:
+            observed_teams[game_id].add(team_id)
+        relevant_teams: dict[UUID, tuple[UUID, ...]] = {}
+        for game in scoped:
+            clubs = {game.home_team_id, game.away_team_id}
+            teams = observed_teams[game.id] & clubs
+            teams.update(
+                affiliation.team_id
+                for affiliation in affiliations
+                if affiliation.team_id in clubs
+                and _affiliation_may_cover(affiliation, game)
+            )
+            if teams:
+                relevant_teams[game.id] = tuple(
+                    team_id
+                    for team_id in (game.home_team_id, game.away_team_id)
+                    if team_id in teams
+                )
+        scoped = [game for game in scoped if game.id in relevant_teams]
+    else:
+        relevant_teams = {game.id: (team.id,) for game in scoped}
+
     known: list[tuple[Game, SelectionEntry]] = []
     uncertain: list[tuple[Game, MembershipState]] = []
     unknown_date_ids: list[UUID] = []
@@ -641,9 +685,8 @@ def select_player_window(
             continue
         eligible_teams = tuple(
             team_id
-            for team_id in (game.home_team_id, game.away_team_id)
-            if (team is None or team_id == team.id)
-            and (
+            for team_id in relevant_teams[game.id]
+            if (
                 home_away == "ALL"
                 or (home_away == "HOME" and team_id == game.home_team_id)
                 or (home_away == "AWAY" and team_id == game.away_team_id)

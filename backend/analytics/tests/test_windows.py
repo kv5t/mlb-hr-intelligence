@@ -25,6 +25,7 @@ from domain.models import (
     PlateAppearance,
     Player,
     PlayerGameParticipation,
+    PlayerTeamAffiliation,
     Season,
     Team,
     Venue,
@@ -149,6 +150,22 @@ class WindowSelectionTests(TestCase):
         season.full_clean()
         season.save()
         return season
+
+    def create_affiliation(
+        self, key, season, team, start=None, end=None, precision="DATE"
+    ):
+        row = PlayerTeamAffiliation(
+            id=fixture_uuid(f"b07:affiliation:{key}"),
+            player=self.slugger,
+            team=team,
+            season=season,
+            effective_from_date=start,
+            effective_to_date_exclusive=end,
+            boundary_precision=precision,
+        )
+        row.full_clean()
+        row.save()
+        return row
 
     def test_team_final_regular_and_incomplete_coverage_stay_selected(self):
         result = self.team_window(window="SEASON")
@@ -354,10 +371,22 @@ class WindowSelectionTests(TestCase):
         )
         self.assertIn(self.game("unassessed").id, unknown.uncertain_candidate_ids)
         partial = self.player_window(window="7G", cutoff=date(2099, 4, 9))
-        self.assertEqual(partial.membership_state, MembershipState.INCOMPLETE)
+        self.assertEqual(partial.membership_state, MembershipState.UNKNOWN)
         self.assertIn(self.game("partial_pa").id, partial.uncertain_candidate_ids)
         self.assertEqual(partial.entries, ())
         self.assertIsNone(partial.actual_game_count)
+
+    def test_partial_player_pa_alone_is_incomplete(self):
+        season = self.isolated_season()
+        game = self.create_game("player-partial-only", date(2098, 4, 1), season=season)
+        self.create_participation(
+            "player-partial-only",
+            game,
+            pa_coverage=PlayerGameParticipation.Coverage.PARTIAL,
+        )
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.INCOMPLETE)
+        self.assertIn(game.id, result.uncertain_candidate_ids)
 
     def test_complete_participation_without_row_is_not_dnp(self):
         season = self.isolated_season()
@@ -512,6 +541,74 @@ class WindowSelectionTests(TestCase):
         self.assertEqual(result.membership_state, MembershipState.UNKNOWN)
         self.assertEqual(result.known_eligible_game_count, 1)
         self.assertIn(unknown.id, result.uncertain_candidate_ids)
+
+    def test_unrelated_team_unknown_coverage_does_not_poison_player(self):
+        season = self.isolated_season()
+        known = self.create_game("relevant-a", date(2098, 4, 1), season=season)
+        self.create_participation("relevant-a", known, pa=True)
+        d = Team(id=fixture_uuid("b08:team:d"), display_name="Synthetic D")
+        d.full_clean()
+        d.save()
+        unrelated = self.create_game(
+            "unrelated-c-d",
+            date(2098, 4, 2),
+            season=season,
+            home=self.c,
+            away=d,
+        )
+        self.create_coverage("unrelated-c-d", unrelated, GameDataCoverage.State.UNKNOWN)
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(tuple(entry.game_id for entry in result.entries), (known.id,))
+        self.assertNotIn(unrelated.id, result.uncertain_candidate_ids)
+
+    def test_positive_new_team_evidence_without_affiliation_is_included(self):
+        season = self.isolated_season()
+        game = self.create_game(
+            "new-team-c",
+            date(2098, 4, 1),
+            season=season,
+            home=self.c,
+            away=self.a,
+        )
+        self.create_participation("new-team-c", game, team=self.c, pa=True)
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(result.entries[0].represented_team_ids, (self.c.id,))
+        self.assertEqual(result.actual_game_count, 1)
+
+    def test_precisely_ended_affiliation_excludes_later_unevidenced_game(self):
+        season = self.isolated_season()
+        self.create_affiliation(
+            "ended-a", season, self.a, date(2098, 4, 1), date(2098, 4, 5)
+        )
+        known = self.create_game("during-affiliation", date(2098, 4, 3), season=season)
+        self.create_participation("during-affiliation", known, pa=True)
+        later = self.create_game("after-affiliation", date(2098, 4, 7), season=season)
+        self.create_coverage("after-affiliation", later, GameDataCoverage.State.UNKNOWN)
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(tuple(entry.game_id for entry in result.entries), (known.id,))
+
+    def test_open_relevant_affiliation_keeps_unknown_candidate(self):
+        season = self.isolated_season()
+        self.create_affiliation("open-a", season, self.a, date(2098, 4, 1))
+        game = self.create_game("open-a-unknown", date(2098, 4, 5), season=season)
+        self.create_coverage("open-a-unknown", game, GameDataCoverage.State.UNKNOWN)
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.UNKNOWN)
+        self.assertIn(game.id, result.uncertain_candidate_ids)
+
+    def test_mixed_unknown_and_partial_candidates_prioritize_unknown(self):
+        season = self.isolated_season()
+        self.create_affiliation("mixed-a", season, self.a, date(2098, 4, 1))
+        unknown = self.create_game("mixed-unknown", date(2098, 4, 1), season=season)
+        partial = self.create_game("mixed-partial", date(2098, 4, 2), season=season)
+        self.create_coverage("mixed-unknown", unknown, GameDataCoverage.State.UNKNOWN)
+        self.create_coverage("mixed-partial", partial, GameDataCoverage.State.PARTIAL)
+        result = select_player_window(season=season, player=self.slugger)
+        self.assertEqual(result.membership_state, MembershipState.UNKNOWN)
+        self.assertEqual(set(result.uncertain_candidate_ids), {unknown.id, partial.id})
 
     def test_uncertain_player_count_is_lower_bound(self):
         result = self.player_window(window="7G", cutoff=date(2099, 4, 9))
