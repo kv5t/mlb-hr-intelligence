@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "django_filters",
     "config.apps.ConfigApp",
     "domain.apps.DomainConfig",
+    "ingestion.apps.IngestionConfig",
 ]
 
 MIDDLEWARE = [

@@ -35,7 +35,6 @@ class CanonicalModel(models.Model):
     def save(self, *args, **kwargs):
         if not self._state.adding and self.id != self._original_id:
             raise ValidationError({"id": "Canonical identity cannot change."})
-        self.full_clean()
         return super().save(*args, **kwargs)
 
 
@@ -114,14 +113,6 @@ class PlayerTeamAffiliation(CanonicalModel):
             models.Index(fields=["player", "effective_from_date"]),
             models.Index(fields=["team", "effective_from_date"]),
         ]
-
-    def clean(self):
-        if self.boundary_precision == self.BoundaryPrecision.UNKNOWN and (
-            self.effective_from_date or self.effective_to_date_exclusive
-        ):
-            raise ValidationError(
-                {"boundary_precision": "Known bounds require DATE precision."}
-            )
 
 
 class Game(CanonicalModel):
@@ -372,6 +363,27 @@ class HomeRunEvent(CanonicalModel):
             )
 
 
+class CoverageReason(models.TextChoices):
+    SOURCE_REQUEST_FAILED = "SOURCE_REQUEST_FAILED"
+    SOURCE_TRUNCATED = "SOURCE_TRUNCATED"
+    PARSE_FAILED = "PARSE_FAILED"
+    SCHEMA_DRIFT = "SCHEMA_DRIFT"
+    FINALITY_UNKNOWN = "FINALITY_UNKNOWN"
+    UNSUPPORTED_STATUS = "UNSUPPORTED_STATUS"
+    STATUS_CONFLICT = "STATUS_CONFLICT"
+    UNRESOLVED_PLAY = "UNRESOLVED_PLAY"
+    NON_PA_PLAY_CLASSIFIED = "NON_PA_PLAY_CLASSIFIED"
+    MISSING_BATTER = "MISSING_BATTER"
+    DUPLICATE_ATBAT_INDEX = "DUPLICATE_ATBAT_INDEX"
+    BOX_SCORE_PA_MISMATCH = "BOX_SCORE_PA_MISMATCH"
+    BOX_SCORE_HR_MISMATCH = "BOX_SCORE_HR_MISMATCH"
+    HR_WITHOUT_PA = "HR_WITHOUT_PA"
+    TEAM_ATTRIBUTION_CONFLICT = "TEAM_ATTRIBUTION_CONFLICT"
+    ORDER_UNRESOLVED = "ORDER_UNRESOLVED"
+    PARTICIPATION_POPULATION_UNVERIFIED = "PARTICIPATION_POPULATION_UNVERIFIED"
+    ACCESS_NOT_APPROVED = "ACCESS_NOT_APPROVED"
+
+
 class GameDataCoverage(CanonicalModel):
     class Domain(models.TextChoices):
         SCHEDULE = "SCHEDULE"
@@ -388,6 +400,9 @@ class GameDataCoverage(CanonicalModel):
     game = models.ForeignKey(Game, on_delete=models.PROTECT)
     domain = models.CharField(max_length=17, choices=Domain)
     state = models.CharField(max_length=11, choices=State, default=State.UNKNOWN)
+    reason_code = models.CharField(
+        max_length=40, choices=CoverageReason, null=True, blank=True
+    )
     assessed_at_utc = models.DateTimeField()
 
     class Meta:
