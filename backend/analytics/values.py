@@ -18,6 +18,7 @@ class MetricState(StrEnum):
 
 Number = int | float | Decimal
 _REASON = re.compile(r"^[A-Z][A-Z0-9_]*$")
+VALUE_ANNOTATION_REASONS = frozenset({"NO_HR_IN_SCOPE"})
 
 
 def _valid_number(value: object) -> bool:
@@ -43,10 +44,10 @@ class MetricValue:
         if not isinstance(self.state, MetricState):
             raise ValueError("Invalid MetricValue state")
         if self.state == MetricState.VALUE:
-            if not _valid_number(self.value) or self.reason is not None:
-                raise ValueError(
-                    "VALUE needs a finite number and no unavailable reason"
-                )
+            if not _valid_number(self.value):
+                raise ValueError("VALUE needs a finite number")
+            if self.reason is not None and self.reason not in VALUE_ANNOTATION_REASONS:
+                raise ValueError("VALUE reason must be a recognized annotation")
         elif self.value is not None:
             raise ValueError("Only VALUE may carry a numeric value")
         if self.unit is not None and (

@@ -203,6 +203,21 @@ def evaluate_selection_coverage(
     )
 
 
+def assess_hr_integrity(
+    pas: list[PlateAppearance], events: list[HomeRunEvent]
+) -> CoverageGate:
+    """Check canonical HR PA/event identity and outcome consistency in one scope."""
+    hr_pa_ids = {
+        pa.id for pa in pas if pa.outcome_category == PlateAppearance.Outcome.HOME_RUN
+    }
+    event_pa_ids = {event.plate_appearance_id for event in events}
+    if hr_pa_ids != event_pa_ids or any(
+        pa.outcome_category == PlateAppearance.Outcome.UNKNOWN for pa in pas
+    ):
+        return CoverageGate(MetricState.INCOMPLETE, "BOX_SCORE_HR_MISMATCH")
+    return CoverageGate(MetricState.VALUE)
+
+
 def assess_hr_zero(
     game: Game, *, team: Team | None = None, player: Player | None = None
 ) -> ZeroEvidence:
@@ -239,19 +254,11 @@ def assess_hr_zero(
     )
     if gate.state != MetricState.VALUE:
         return ZeroEvidence(gate.state, None, gate.reason, events)
-    hr_pas = set(
-        PlateAppearance.objects.filter(
-            game=game, outcome_category=PlateAppearance.Outcome.HOME_RUN
-        ).values_list("id", flat=True)
+    integrity = assess_hr_integrity(
+        list(PlateAppearance.objects.filter(game=game)), event_rows
     )
-    event_pas = {event.plate_appearance_id for event in event_rows}
-    unknown_pas = PlateAppearance.objects.filter(
-        game=game, outcome_category=PlateAppearance.Outcome.UNKNOWN
-    ).exists()
-    if hr_pas != event_pas or unknown_pas:
-        return ZeroEvidence(
-            MetricState.INCOMPLETE, None, "BOX_SCORE_HR_MISMATCH", events
-        )
+    if integrity.state != MetricState.VALUE:
+        return ZeroEvidence(integrity.state, None, integrity.reason, events)
     return ZeroEvidence(MetricState.VALUE, not events, None, events)
 
 
@@ -387,17 +394,12 @@ def resolve_matrix_cell(game: Game, player: Player, team: Team) -> MatrixCellEvi
             hr_event_ids=event_ids,
             reason="BOX_SCORE_PA_MISMATCH",
         )
-    hr_pa_ids = {
-        pa.id for pa in pas if pa.outcome_category == PlateAppearance.Outcome.HOME_RUN
-    }
-    event_pa_ids = {event.plate_appearance_id for event in events}
-    if hr_pa_ids != event_pa_ids or any(
-        pa.outcome_category == PlateAppearance.Outcome.UNKNOWN for pa in pas
-    ):
+    integrity = assess_hr_integrity(pas, events)
+    if integrity.state != MetricState.VALUE:
         return MatrixCellEvidence(
             MatrixCellState.INCOMPLETE,
             hr_event_ids=event_ids,
-            reason="BOX_SCORE_HR_MISMATCH",
+            reason=integrity.reason,
         )
     if not pas:
         return MatrixCellEvidence(MatrixCellState.ZERO_PA_APPEARANCE)

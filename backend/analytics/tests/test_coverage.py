@@ -52,6 +52,14 @@ class MetricValueTests(TestCase):
             self.assertEqual(result.numerator, 2)
             self.assertEqual(result.denominator, 3)
 
+    def test_value_annotation_is_narrowly_allowed(self):
+        annotated = MetricValue(MetricState.VALUE, 3, "GAMES", reason="NO_HR_IN_SCOPE")
+        self.assertEqual(annotated.value, 3)
+        self.assertEqual(annotated.reason, "NO_HR_IN_SCOPE")
+        for reason in ("UNKNOWN", "SOURCE_TRUNCATED", "ZERO_DENOMINATOR", "NO_GAMES"):
+            with self.subTest(reason=reason), self.assertRaises(ValueError):
+                MetricValue(MetricState.VALUE, 0, reason=reason)
+
     def test_invalid_combinations_raise(self):
         invalid = (
             {"state": MetricState.VALUE},

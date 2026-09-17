@@ -583,6 +583,22 @@ def _affiliation_may_cover(affiliation: PlayerTeamAffiliation, game: Game) -> bo
     )
 
 
+def _precise_departure_excludes(
+    affiliations: list[PlayerTeamAffiliation], game: Game
+) -> bool:
+    """An exact ended team interval can exclude an unevidenced later game."""
+    if game.official_date is None:
+        return False
+    if any(_affiliation_may_cover(row, game) for row in affiliations):
+        return False
+    return any(
+        row.boundary_precision == PlayerTeamAffiliation.BoundaryPrecision.DATE
+        and row.effective_to_date_exclusive is not None
+        and row.effective_to_date_exclusive <= game.official_date
+        for row in affiliations
+    )
+
+
 def select_player_window(
     *,
     season: Season | int,
@@ -643,12 +659,12 @@ def select_player_window(
         )
     }
 
-    if team is None:
-        affiliations = list(
-            PlayerTeamAffiliation.objects.filter(player=player).filter(
-                Q(season=season) | Q(season__isnull=True)
-            )
+    affiliations = list(
+        PlayerTeamAffiliation.objects.filter(player=player).filter(
+            Q(season=season) | Q(season__isnull=True)
         )
+    )
+    if team is None:
         observed_teams: dict[UUID, set[UUID]] = defaultdict(set)
         for game_id, team_id in participation_rows:
             observed_teams[game_id].add(team_id)
@@ -672,6 +688,14 @@ def select_player_window(
                 )
         scoped = [game for game in scoped if game.id in relevant_teams]
     else:
+        team_affiliations = [row for row in affiliations if row.team_id == team.id]
+        scoped = [
+            game
+            for game in scoped
+            if (game.id, team.id) in participation_rows
+            or (game.id, team.id) in pa_rows
+            or not _precise_departure_excludes(team_affiliations, game)
+        ]
         relevant_teams = {game.id: (team.id,) for game in scoped}
 
     known: list[tuple[Game, SelectionEntry]] = []

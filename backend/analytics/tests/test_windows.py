@@ -590,6 +590,67 @@ class WindowSelectionTests(TestCase):
         self.assertEqual(result.membership_state, MembershipState.RESOLVED)
         self.assertEqual(tuple(entry.game_id for entry in result.entries), (known.id,))
 
+    def test_team_filtered_precise_departure_excludes_later_unknown_game(self):
+        season = self.isolated_season()
+        self.create_affiliation(
+            "filtered-ended-a",
+            season,
+            self.a,
+            date(2098, 4, 1),
+            date(2098, 4, 5),
+        )
+        known = self.create_game("filtered-a-known", date(2098, 4, 3), season=season)
+        self.create_participation("filtered-a-known", known, pa=True)
+        later = self.create_game("filtered-a-later", date(2098, 4, 7), season=season)
+        self.create_coverage("filtered-a-later", later, GameDataCoverage.State.UNKNOWN)
+        result = select_player_window(
+            season=season, player=self.slugger, represented_team=self.a
+        )
+        self.assertEqual(result.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(tuple(entry.game_id for entry in result.entries), (known.id,))
+        self.assertNotIn(later.id, result.uncertain_candidate_ids)
+
+    def test_team_filtered_positive_evidence_overrides_precise_end(self):
+        season = self.isolated_season()
+        self.create_affiliation(
+            "filtered-positive-a",
+            season,
+            self.a,
+            date(2098, 4, 1),
+            date(2098, 4, 5),
+        )
+        later = self.create_game(
+            "filtered-positive-later", date(2098, 4, 7), season=season
+        )
+        self.create_participation("filtered-positive-later", later, pa=True)
+        result = select_player_window(
+            season=season, player=self.slugger, represented_team=self.a
+        )
+        self.assertEqual(result.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(tuple(entry.game_id for entry in result.entries), (later.id,))
+
+    def test_team_filtered_unknown_precision_keeps_uncertain_game(self):
+        season = self.isolated_season()
+        self.create_affiliation(
+            "filtered-imprecise-a",
+            season,
+            self.a,
+            date(2098, 4, 1),
+            date(2098, 4, 5),
+            precision="UNKNOWN",
+        )
+        later = self.create_game(
+            "filtered-imprecise-later", date(2098, 4, 7), season=season
+        )
+        self.create_coverage(
+            "filtered-imprecise-later", later, GameDataCoverage.State.UNKNOWN
+        )
+        result = select_player_window(
+            season=season, player=self.slugger, represented_team=self.a
+        )
+        self.assertEqual(result.membership_state, MembershipState.UNKNOWN)
+        self.assertIn(later.id, result.uncertain_candidate_ids)
+
     def test_open_relevant_affiliation_keeps_unknown_candidate(self):
         season = self.isolated_season()
         self.create_affiliation("open-a", season, self.a, date(2098, 4, 1))
