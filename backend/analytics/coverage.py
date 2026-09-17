@@ -218,6 +218,25 @@ def assess_hr_integrity(
     return CoverageGate(MetricState.VALUE)
 
 
+def assess_player_pa_integrity(
+    rows: list[PlayerGameParticipation], pas: list[PlateAppearance]
+) -> CoverageGate:
+    """Reconcile known reported counts with canonical PAs per represented team."""
+    counts: dict[tuple[UUID, UUID, UUID], int] = {}
+    for pa in pas:
+        key = (pa.game_id, pa.batter_id, pa.batting_team_id)
+        counts[key] = counts.get(key, 0) + 1
+    for row in rows:
+        if (
+            row.pa_coverage == PlayerGameParticipation.Coverage.COMPLETE
+            and row.reported_pa_count is not None
+            and row.reported_pa_count
+            != counts.get((row.game_id, row.player_id, row.team_id), 0)
+        ):
+            return CoverageGate(MetricState.INCOMPLETE, "BOX_SCORE_PA_MISMATCH")
+    return CoverageGate(MetricState.VALUE)
+
+
 def assess_hr_zero(
     game: Game, *, team: Team | None = None, player: Player | None = None
 ) -> ZeroEvidence:
@@ -388,11 +407,12 @@ def resolve_matrix_cell(game: Game, player: Player, team: Team) -> MatrixCellEvi
         return MatrixCellEvidence(
             MatrixCellState.INCOMPLETE, hr_event_ids=event_ids, reason=gate.reason
         )
-    if row.reported_pa_count is not None and row.reported_pa_count != len(pas):
+    pa_integrity = assess_player_pa_integrity([row], pas)
+    if pa_integrity.state != MetricState.VALUE:
         return MatrixCellEvidence(
             MatrixCellState.INCOMPLETE,
             hr_event_ids=event_ids,
-            reason="BOX_SCORE_PA_MISMATCH",
+            reason=pa_integrity.reason,
         )
     integrity = assess_hr_integrity(pas, events)
     if integrity.state != MetricState.VALUE:

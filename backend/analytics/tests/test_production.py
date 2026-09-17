@@ -470,3 +470,28 @@ class ProductionMetricTests(TestCase):
             compute_player_production_metrics(team_selection)
         with self.assertRaises(ValueError):
             compute_team_production_metrics(player_selection)
+
+    def test_reported_player_pa_count_reconciles_without_replacing_rows(self):
+        season = self.season()
+        (game_id,) = self.sequence(season, "reported-pa", (complete_step(1, 3),))
+        row = PlayerGameParticipation.objects.get(game_id=game_id, player=self.slugger)
+        for reported, expected in (
+            (3, MetricState.VALUE),
+            (4, MetricState.INCOMPLETE),
+            (2, MetricState.INCOMPLETE),
+            (None, MetricState.VALUE),
+        ):
+            with self.subTest(reported=reported):
+                row.reported_pa_count = reported
+                row.full_clean()
+                row.save()
+                _, player = self.metrics(season)
+                for name in ("pa", "hr_per_pa", "pa_per_hr", "hr", "hr_games"):
+                    self.assertEqual(player[f"player.{name}"].state, expected)
+                    if expected == MetricState.INCOMPLETE:
+                        self.assertEqual(
+                            player[f"player.{name}"].reason, "BOX_SCORE_PA_MISMATCH"
+                        )
+                _, team = self.metrics(season, "TEAM")
+                self.assert_value(team, "team.pa", 3, 3)
+                self.assert_value(team, "team.hr", 1, 1)

@@ -81,6 +81,17 @@ class SelectionEntry:
 
 
 @dataclass(frozen=True)
+class CandidateObservation:
+    """Pre-window opportunity or uncertainty, ordered under the B07 rules."""
+
+    game_id: UUID
+    order_key: tuple
+    entry: SelectionEntry | None
+    membership_state: MembershipState
+    known_non_opportunity: bool = False
+
+
+@dataclass(frozen=True)
 class SelectionResult:
     subject_kind: str
     subject_id: UUID
@@ -101,6 +112,7 @@ class SelectionResult:
     ambiguous_candidate_ids: tuple[UUID, ...]
     uncertain_candidate_ids: tuple[UUID, ...]
     unverified_order_groups: tuple[tuple[UUID, ...], ...]
+    full_scope_observations: tuple[CandidateObservation, ...] = ()
 
 
 WINDOW_SIZES = {"7G": 7, "15G": 15, "30G": 30, "60G": 60, "SEASON": None}
@@ -289,11 +301,40 @@ def _finish(
     resolved_cutoff: Cutoff | None,
     qualified: list[tuple[Game, SelectionEntry]],
     uncertain: list[tuple[Game, MembershipState]],
+    non_opportunities: list[Game],
     unknown_date_ids: tuple[UUID, ...],
     cutoff_tie_ids: tuple[UUID, ...],
     cutoff_game_id: UUID | None,
 ) -> SelectionResult:
     qualified.sort(key=lambda pair: _order_key(pair[0]))
+    full_scope_observations = tuple(
+        sorted(
+            [
+                CandidateObservation(
+                    game.id,
+                    _meaningful_order_key(game),
+                    entry,
+                    MembershipState.RESOLVED,
+                )
+                for game, entry in qualified
+            ]
+            + [
+                CandidateObservation(game.id, _meaningful_order_key(game), None, state)
+                for game, state in uncertain
+            ]
+            + [
+                CandidateObservation(
+                    game.id,
+                    _meaningful_order_key(game),
+                    None,
+                    MembershipState.RESOLVED,
+                    True,
+                )
+                for game in non_opportunities
+            ],
+            key=lambda item: (item.order_key, item.game_id),
+        )
+    )
     known_games = [game for game, _ in qualified]
     known_count = _lower_bound(requested_n, len(qualified))
     relevant_uncertain: list[tuple[Game, MembershipState]] = []
@@ -343,6 +384,7 @@ def _finish(
             (),
             uncertain_ids,
             known_order_groups,
+            full_scope_observations,
         )
 
     cutoff_tie = set(cutoff_tie_ids)
@@ -382,6 +424,7 @@ def _finish(
                 cutoff_tie_ids,
                 (),
                 (cutoff_tie_ids,),
+                full_scope_observations,
             )
 
     selected = qualified if requested_n is None else qualified[-requested_n:]
@@ -423,6 +466,7 @@ def _finish(
                 boundary_ids,
                 (),
                 (boundary_ids,),
+                full_scope_observations,
             )
     return SelectionResult(
         subject_kind,
@@ -444,6 +488,7 @@ def _finish(
         (),
         (),
         groups,
+        full_scope_observations,
     )
 
 
@@ -493,6 +538,7 @@ def select_team_window(
             for game in known
         ],
         uncertain=[],
+        non_opportunities=[],
         unknown_date_ids=unknown_date_ids,
         cutoff_tie_ids=cutoff_tie_ids,
         cutoff_game_id=cutoff_game.id if cutoff_game else None,
@@ -700,6 +746,7 @@ def select_player_window(
 
     known: list[tuple[Game, SelectionEntry]] = []
     uncertain: list[tuple[Game, MembershipState]] = []
+    non_opportunities: list[Game] = []
     unknown_date_ids: list[UUID] = []
     cutoff_tie_ids = _cutoff_tie_ids(scoped, resolved_cutoff, cutoff_game)
     for game in scoped:
@@ -732,6 +779,8 @@ def select_player_window(
             known.append((game, entry))
         elif state is not None:
             uncertain.append((game, state))
+        else:
+            non_opportunities.append(game)
     return _finish(
         subject_kind="PLAYER",
         subject_id=player.id,
@@ -744,6 +793,7 @@ def select_player_window(
         resolved_cutoff=resolved_cutoff,
         qualified=known,
         uncertain=uncertain,
+        non_opportunities=non_opportunities,
         unknown_date_ids=tuple(sorted(unknown_date_ids)),
         cutoff_tie_ids=cutoff_tie_ids,
         cutoff_game_id=cutoff_game.id if cutoff_game else None,

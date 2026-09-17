@@ -3,9 +3,19 @@
 from collections import defaultdict
 from decimal import Decimal, localcontext
 
-from domain.models import GameDataCoverage, HomeRunEvent, PlateAppearance
+from domain.models import (
+    GameDataCoverage,
+    HomeRunEvent,
+    PlateAppearance,
+    PlayerGameParticipation,
+)
 
-from .coverage import CoverageGate, assess_hr_integrity, evaluate_selection_coverage
+from .coverage import (
+    CoverageGate,
+    assess_hr_integrity,
+    assess_player_pa_integrity,
+    evaluate_selection_coverage,
+)
 from .values import MetricState, MetricValue
 from .windows import MembershipState, SelectionResult
 
@@ -183,6 +193,20 @@ def _subject_pas(
     )
     if not consistent:
         return pas, CoverageGate(MetricState.INCOMPLETE, "BOX_SCORE_PA_MISMATCH")
+    expected_rows = {
+        row_id for entry in selection.entries for row_id in entry.participation_ids
+    }
+    rows = list(PlayerGameParticipation.objects.filter(id__in=expected_rows))
+    if {row.id for row in rows} != expected_rows or any(
+        row.player_id != selection.subject_id
+        or row.game_id not in ids_by_game
+        or row.team_id not in represented_teams_by_game[row.game_id]
+        for row in rows
+    ):
+        return pas, CoverageGate(MetricState.INCOMPLETE, "BOX_SCORE_PA_MISMATCH")
+    integrity = assess_player_pa_integrity(rows, pas)
+    if integrity.state != MetricState.VALUE:
+        return pas, integrity
     # B07 already required complete PA evidence for each selected player row.
     return pas, CoverageGate(MetricState.VALUE)
 
