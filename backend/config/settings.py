@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "django_filters",
     "config.apps.ConfigApp",
+    "domain.apps.DomainConfig",
 ]
 
 MIDDLEWARE = [
