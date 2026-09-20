@@ -222,7 +222,6 @@ def _resolve_cutoff(
     request: Cutoff, season: Season, anchors: list[Game]
 ) -> tuple[Cutoff | None, Game | None]:
     known_dates = [game.official_date for game in anchors if game.official_date]
-    has_unknown_date = any(game.official_date is None for game in anchors)
     if request.kind == CutoffKind.LATEST:
         if not anchors:
             raise SelectionError("NO_FINAL_REGULAR_GAME")
@@ -230,13 +229,8 @@ def _resolve_cutoff(
             return None, None
         return Cutoff.on_date(max(known_dates)), None
     if request.kind == CutoffKind.DATE:
-        if known_dates and not has_unknown_date:
-            if request.official_date < min(known_dates):
-                raise SelectionError("CUTOFF_BEFORE_SCOPE")
-            if request.official_date > max(known_dates):
-                raise SelectionError("CUTOFF_AFTER_SCOPE")
-        elif not anchors:
-            raise SelectionError("NO_FINAL_REGULAR_GAME")
+        # Explicit public dates are valid before/after observed games. Unknown
+        # official dates remain a membership uncertainty in _finish.
         return request, None
     game = Game.objects.filter(pk=request.game_id).first()
     if game is None:

@@ -538,13 +538,23 @@ class RecurrenceTests(TestCase):
         season = self.season()
         self.sequence(season, "empty", (0,))
         _, result = self.result(season, "TEAM", home_away="AWAY")
-        self.assertEqual(result.gap_series.state, MetricState.NOT_APPLICABLE)
-        self.assertTrue(
-            all(
-                item.state == MetricState.NOT_APPLICABLE and item.reason == "NO_GAMES"
-                for item in result.metrics.values()
-            )
+        self.assertEqual(
+            (
+                result.gap_series.state,
+                result.gap_series.values,
+                result.gap_series.reason,
+                result.gap_series.hr_game_count,
+                result.gap_series.gap_count,
+            ),
+            (MetricState.INSUFFICIENT_HISTORY, (), "INSUFFICIENT_HISTORY", 0, 0),
         )
+        for name, item in result.metrics.items():
+            expected = (
+                (MetricState.INSUFFICIENT_HISTORY, "INSUFFICIENT_HISTORY")
+                if name.endswith(("avg_hr_gap_games", "median_hr_gap_games"))
+                else (MetricState.NOT_APPLICABLE, "NO_GAMES")
+            )
+            self.assertEqual((item.state, item.reason), expected)
 
     def test_unresolved_pa_ordinal_is_material_only_when_hr_status_differs(self):
         season = self.season()

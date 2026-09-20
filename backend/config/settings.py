@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "django_filters",
+    "api.apps.ApiConfig",
     "config.apps.ConfigApp",
     "domain.apps.DomainConfig",
     "ingestion.apps.IngestionConfig",

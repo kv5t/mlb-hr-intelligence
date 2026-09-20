@@ -334,10 +334,23 @@ def _calculate(selection: SelectionResult, subject_kind: str) -> RecurrenceResul
             metrics[f"{prefix}.{name}"] = _unavailable(local_gate, units[name])
     elif not window:
         gaps = GapSeries(
-            f"{prefix}.hr_gap_games", MetricState.NOT_APPLICABLE, (), "NO_GAMES", 0, 0
+            f"{prefix}.hr_gap_games",
+            MetricState.INSUFFICIENT_HISTORY,
+            (),
+            "INSUFFICIENT_HISTORY",
+            0,
+            0,
         )
         for name in local_names:
-            metrics[f"{prefix}.{name}"] = _no_games(units[name])
+            metrics[f"{prefix}.{name}"] = (
+                MetricValue(
+                    MetricState.INSUFFICIENT_HISTORY,
+                    unit=units[name],
+                    reason="INSUFFICIENT_HISTORY",
+                )
+                if name in ("avg_hr_gap_games", "median_hr_gap_games")
+                else _no_games(units[name])
+            )
     else:
         indices = [index for index, item in enumerate(window) if item.hr_game]
         gap_values = tuple(

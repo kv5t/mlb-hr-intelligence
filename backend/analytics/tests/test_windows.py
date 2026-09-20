@@ -684,13 +684,25 @@ class WindowSelectionTests(TestCase):
             self.team_window(home_away="BOTH")
         with self.assertRaisesMessage(SelectionError, "INVALID_CUTOFF"):
             self.team_window(cutoff="04/20/2099")
-        with self.assertRaisesMessage(SelectionError, "CUTOFF_BEFORE_SCOPE"):
-            self.team_window(cutoff=date(2099, 3, 31))
-        with self.assertRaisesMessage(SelectionError, "CUTOFF_AFTER_SCOPE"):
-            self.team_window(cutoff=date(2099, 4, 30))
+        dated_season = self.isolated_season()
+        self.create_game("date-range", date(2098, 4, 4), season=dated_season)
+        before = select_team_window(
+            season=dated_season, team=self.a, cutoff=date(2098, 3, 31)
+        )
+        self.assertEqual(before.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(before.actual_game_count, 0)
+        after = select_team_window(
+            season=dated_season, team=self.a, cutoff=date(2098, 4, 30)
+        )
+        self.assertEqual(after.membership_state, MembershipState.RESOLVED)
+        self.assertEqual(after.actual_game_count, 1)
+        inside = select_team_window(
+            season=dated_season, team=self.a, cutoff=date(2098, 4, 4)
+        )
+        self.assertEqual(inside.actual_game_count, 1)
         with self.assertRaisesMessage(SelectionError, "CUTOFF_WRONG_SEASON"):
-            other = self.isolated_season()
-            game = self.create_game("wrong-season", date(2098, 4, 1), season=other)
+            other = self.isolated_season(2096)
+            game = self.create_game("wrong-season", date(2096, 4, 1), season=other)
             self.team_window(cutoff=game.id)
         with self.assertRaisesMessage(SelectionError, "CUTOFF_GAME_OUTSIDE_SCOPE"):
             self.team_window(cutoff=self.game("trade_b_zero").id)
@@ -699,6 +711,12 @@ class WindowSelectionTests(TestCase):
         with self.assertRaisesMessage(SelectionError, "NO_FINAL_REGULAR_GAME"):
             other = self.isolated_season(2097)
             select_team_window(season=other, team=self.a)
+        self.assertEqual(
+            select_team_window(
+                season=other, team=self.a, cutoff=date(2097, 4, 1)
+            ).actual_game_count,
+            0,
+        )
 
     def test_cutoff_date_and_uuid_forms_are_equivalent(self):
         date_result = self.team_window(cutoff="2099-04-15")
