@@ -18,7 +18,7 @@ export function PartialDataNotice({ children = 'Some values use partial or unava
   return <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">{children}</p>
 }
 
-export function ErrorState({ error }: { error: unknown }) {
+export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const clientError = error instanceof ApiClientError ? error : null
   const title =
     clientError?.status === 400 ? 'Invalid request' :
@@ -30,6 +30,15 @@ export function ErrorState({ error }: { error: unknown }) {
     <section role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-5">
       <h2 className="font-semibold">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{message}</p>
+      {onRetry && clientError?.status !== 400 && clientError?.status !== 404 ? (
+        <button
+          className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          onClick={onRetry}
+          type="button"
+        >
+          Retry
+        </button>
+      ) : null}
     </section>
   )
 }

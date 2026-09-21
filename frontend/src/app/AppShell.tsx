@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const core = [
   ['Today', '/today'],
@@ -9,7 +9,7 @@ const core = [
   ['Games', '/games'],
 ] as const
 
-function CoreLink({ label, to }: { label: string; to: string }) {
+function CoreLink({ label, to, onNavigate }: { label: string; to: string; onNavigate?: () => void }) {
   return (
     <NavLink
       className={({ isActive }) =>
@@ -17,6 +17,7 @@ function CoreLink({ label, to }: { label: string; to: string }) {
           isActive ? 'bg-primary text-primary-foreground underline decoration-2 underline-offset-4' : 'hover:bg-muted'
         }`
       }
+      onClick={onNavigate}
       to={to}
     >
       {({ isActive }) => <>{label}{isActive ? <span className="sr-only">, current page</span> : null}</>}
@@ -29,7 +30,23 @@ function FutureDestination({ children, compactHidden = false }: { children: stri
 }
 
 export function AppShell() {
-  const [moreOpen, setMoreOpen] = useState(false)
+  const [moreOpenedAt, setMoreOpenedAt] = useState<string | null>(null)
+  const location = useLocation()
+  const moreButton = useRef<HTMLButtonElement>(null)
+  const routeKey = `${location.pathname}${location.search}`
+  const moreOpen = moreOpenedAt === routeKey
+
+  useEffect(() => {
+    if (!moreOpen) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMoreOpenedAt(null)
+        moreButton.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [moreOpen])
   return (
     <div className="min-h-svh bg-background text-foreground">
       <a className="sr-only z-50 rounded bg-background p-3 focus:not-sr-only focus:fixed focus:left-3 focus:top-3" href="#main-content">Skip to content</a>
@@ -54,12 +71,13 @@ export function AppShell() {
               aria-expanded={moreOpen}
               aria-label="More navigation"
               className="w-full rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2"
-              onClick={() => setMoreOpen((open) => !open)}
+              onClick={() => setMoreOpenedAt((openedAt) => openedAt === routeKey ? null : routeKey)}
+              ref={moreButton}
               type="button"
             >More</button>
             {moreOpen ? (
               <div className="absolute bottom-full right-0 mb-3 min-w-44 rounded-lg border bg-card p-2 shadow-lg">
-                <CoreLink label="Games" to="/games" />
+                <CoreLink label="Games" onNavigate={() => setMoreOpenedAt(null)} to="/games" />
                 <div className="mt-1 flex flex-col border-t pt-1">
                   <FutureDestination>Matchup</FutureDestination>
                   <FutureDestination>Explore</FutureDestination>

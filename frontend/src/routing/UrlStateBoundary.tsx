@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-import { parseUrlState } from './urlState'
+import { parseUrlState, type RouteSearchScope } from './urlState'
 
-export function UrlStateBoundary({ children }: { children: ReactNode }) {
+export function UrlStateBoundary({ children, route = 'generic' }: { children: ReactNode; route?: RouteSearchScope }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const parsed = parseUrlState(searchParams)
+  const parsed = parseUrlState(searchParams, route)
   if (parsed.issues.length === 0) return children
   return (
     <section aria-labelledby="invalid-url-title" className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950">

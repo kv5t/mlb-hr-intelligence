@@ -377,7 +377,9 @@ def build_batting_sequence(
         )
 
 
-def load_synthetic_fixtures() -> FixtureManifest:
+def load_synthetic_fixtures(
+    *, starts_on: date | None = None, ends_on: date | None = None
+) -> FixtureManifest:
     """Load the small B06 fixture pack without HTTP, approvals or destructive reset."""
     with transaction.atomic():
         builder = _Builder()
@@ -386,6 +388,8 @@ def load_synthetic_fixtures() -> FixtureManifest:
             "season:synthetic",
             year=FIXTURE_YEAR,
             label="SYNTHETIC FIXTURE SEASON",
+            starts_on=starts_on,
+            ends_on=ends_on,
         )
         teams = {
             slug: builder.ensure(

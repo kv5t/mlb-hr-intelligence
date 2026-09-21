@@ -1,5 +1,24 @@
 import { z } from 'zod'
 
+export const WINDOWS = ['7G', '15G', '30G', '60G', 'SEASON'] as const
+export const GAME_STATUSES = [
+  'SCHEDULED',
+  'POSTPONED',
+  'RESCHEDULED',
+  'IN_PROGRESS',
+  'SUSPENDED',
+  'COMPLETED',
+  'CANCELLED',
+  'OTHER',
+  'UNKNOWN',
+] as const
+export const GAME_ORDERINGS = [
+  'official_date',
+  '-official_date',
+  'scheduled_start_at_utc',
+  '-scheduled_start_at_utc',
+] as const
+
 const pageFields = {
   page: z.number().int().positive().optional(),
   page_size: z.number().int().positive().max(100).optional(),
@@ -11,6 +30,8 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
 })
 const uuid = z.string().uuid()
+
+export const isCanonicalUuid = (value: string) => uuid.safeParse(value).success
 
 export const seasonsParamsSchema = z.object(pageFields)
 export const teamsParamsSchema = z.object({
@@ -35,33 +56,14 @@ export const gamesParamsSchema = z.object({
   date_from: date.optional(),
   date_to: date.optional(),
   team: uuid.optional(),
-  status: z
-    .enum([
-      'SCHEDULED',
-      'POSTPONED',
-      'RESCHEDULED',
-      'IN_PROGRESS',
-      'SUSPENDED',
-      'COMPLETED',
-      'CANCELLED',
-      'OTHER',
-      'UNKNOWN',
-    ])
-    .optional(),
-  ordering: z
-    .enum([
-      'official_date',
-      '-official_date',
-      'scheduled_start_at_utc',
-      '-scheduled_start_at_utc',
-    ])
-    .optional(),
+  status: z.enum(GAME_STATUSES).optional(),
+  ordering: z.enum(GAME_ORDERINGS).optional(),
   ...pageFields,
 })
 export const todayParamsSchema = z.object({
   season: year,
   date,
-  window: z.enum(['7G', '15G', '30G', '60G', 'SEASON']).optional(),
+  window: z.enum(WINDOWS).optional(),
 })
 
 export type SeasonsParams = z.input<typeof seasonsParamsSchema>

@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
 import { ApiClientError } from '@/api'
 import { EmptyState, ErrorState, InitialLoading, PartialDataNotice, RefreshingStatus } from './PageStates'
@@ -20,5 +20,14 @@ describe('shared page states', () => {
     const error = new ApiClientError({ kind: 'api', status: 503, code: 'REVISION_UNAVAILABLE', message: 'Try later' })
     render(<ErrorState error={error} />)
     expect(screen.getByRole('alert')).toHaveTextContent('Service temporarily unavailable')
+  })
+
+  it('offers retry for transient failures but not invalid requests', () => {
+    const retry = vi.fn()
+    const { rerender } = render(<ErrorState error={new ApiClientError({ kind: 'api', status: 503, code: 'UNAVAILABLE', message: 'Unavailable' })} onRetry={retry} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledOnce()
+    rerender(<ErrorState error={new ApiClientError({ kind: 'api', status: 400, code: 'INVALID', message: 'Invalid' })} onRetry={retry} />)
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
   })
 })

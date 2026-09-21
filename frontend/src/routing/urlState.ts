@@ -1,12 +1,14 @@
 import { z } from 'zod'
 
+import { GAME_ORDERINGS, GAME_STATUSES, WINDOWS } from '@/api/params'
+
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const parsed = new Date(`${value}T00:00:00Z`)
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value
 })
 const definitions = {
   season: z.string().regex(/^\d{4}$/),
-  window: z.enum(['7G', '15G', '30G', '60G', 'SEASON']),
+  window: z.enum(WINDOWS),
   cutoff: date,
   team: z.string().uuid(),
   home_away: z.enum(['ALL', 'HOME', 'AWAY']),
@@ -19,20 +21,31 @@ const definitions = {
   date,
   date_from: date,
   date_to: date,
-  status: z.enum([
-    'SCHEDULED',
-    'POSTPONED',
-    'RESCHEDULED',
-    'IN_PROGRESS',
-    'SUSPENDED',
-    'COMPLETED',
-    'CANCELLED',
-    'OTHER',
-    'UNKNOWN',
-  ]),
+  status: z.enum(GAME_STATUSES),
 } as const
 
+export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'generic'
 export type UrlStateKey = keyof typeof definitions
+
+const routeDefinitions: Record<
+  RouteSearchScope,
+  Partial<Record<UrlStateKey, z.ZodType<string>>>
+> = {
+  today: { season: definitions.season, date: definitions.date, window: definitions.window },
+  games: {
+    season: definitions.season,
+    date_from: definitions.date_from,
+    date_to: definitions.date_to,
+    team: definitions.team,
+    status: definitions.status,
+    ordering: z.enum(GAME_ORDERINGS),
+    page: definitions.page,
+    page_size: definitions.page_size,
+  },
+  gameDetail: {},
+  generic: definitions,
+}
+
 export type UrlState = Partial<Record<UrlStateKey, string>>
 export type UrlStateIssue = { key: string; value: string; message: string }
 
@@ -42,7 +55,10 @@ export type ParsedUrlState = {
   issues: UrlStateIssue[]
 }
 
-export function parseUrlState(params: URLSearchParams): ParsedUrlState {
+export function parseUrlState(
+  params: URLSearchParams,
+  route: RouteSearchScope = 'generic',
+): ParsedUrlState {
   const state: UrlState = {}
   const validParams = new URLSearchParams()
   const issues: UrlStateIssue[] = []
@@ -55,7 +71,7 @@ export function parseUrlState(params: URLSearchParams): ParsedUrlState {
       continue
     }
     seen.add(key)
-    const schema = definitions[key as UrlStateKey]
+    const schema = routeDefinitions[route][key as UrlStateKey]
     if (!schema) {
       issues.push({ key, value, message: 'Unsupported parameter' })
       continue

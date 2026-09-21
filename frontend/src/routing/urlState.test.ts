@@ -23,4 +23,10 @@ describe('URL state', () => {
     expect(next.get('page')).toBe('1')
     expect(next.get('search')).toBe('slugger')
   })
+
+  it('rejects globally known parameters when a route does not support them', () => {
+    expect(parseUrlState(new URLSearchParams('status=COMPLETED'), 'today').issues).toHaveLength(1)
+    expect(parseUrlState(new URLSearchParams('window=7G'), 'games').issues).toHaveLength(1)
+    expect(parseUrlState(new URLSearchParams('ordering=garbage'), 'games').issues).toHaveLength(1)
+  })
 })
