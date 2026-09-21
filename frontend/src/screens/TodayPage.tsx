@@ -113,7 +113,7 @@ function TodayContent({ params, seasons }: { params: TodayParams; seasons: Array
                       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                         {[
                           ['player.hr', 'HR'],
-                          ['player.hr_game_pct', 'HR games'],
+                          ['player.hr_game_pct', 'Games with HR %'],
                           ['player.current_hr_drought_games', 'Drought'],
                           ['player.current_hr_streak_games', 'Streak'],
                         ].map(([id, label]) => metrics[id] ? (

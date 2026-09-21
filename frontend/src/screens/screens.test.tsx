@@ -43,12 +43,15 @@ function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function installApi(options: { todayResponses?: Response[] } = {}) {
+function installApi(options: { todayResponses?: Response[]; failTeams?: boolean } = {}) {
   const todayResponses = [...(options.todayResponses ?? [json(today)])]
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.startsWith('/api/v1/seasons/')) return json(seasonPage)
-    if (url.startsWith('/api/v1/teams/')) return json({ ...seasonPage, results: [team()] })
+    if (url.startsWith('/api/v1/teams/')) {
+      if (options.failTeams) return json({ error: { code: 'UNAVAILABLE', message: 'Discovery unavailable.', details: {} }, meta: { dataset_revision: null, data_as_of: null } }, 503)
+      return json({ ...seasonPage, results: [team()] })
+    }
     if (url.startsWith(`/api/v1/games/${UUIDS.game}/`)) return json(detail)
     if (url.startsWith('/api/v1/games/')) return json({ ...seasonPage, count: 3, next: '/api/v1/games/?page=2', results: [game, secondGame, thirdGame] })
     if (url.startsWith('/api/v1/today/')) return todayResponses.shift() ?? json(today)
@@ -70,6 +73,7 @@ describe('Today vertical slice', () => {
     expect(screen.getAllByText('Partial data').length).toBeGreaterThan(0)
     expect(screen.getByText(/ranking completeness is unknown/i)).toBeInTheDocument()
     expect(screen.getByText('Observed rank 1')).toBeInTheDocument()
+    expect(screen.getByText('Games with HR %')).toBeInTheDocument()
   })
 
   it('retries a 503 without losing the explicit URL scope', async () => {
@@ -116,6 +120,15 @@ describe('Games vertical slice', () => {
     renderApp('/games?season=2099&page=1')
     fireEvent.click(await screen.findByRole('button', { name: 'Next' }))
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/v1/games/?page=2&season=2099'))).toBe(true))
+  })
+
+  it('keeps game rows usable when auxiliary team discovery fails', async () => {
+    installApi({ failTeams: true })
+    renderApp(`/games?season=2099&team=${UUIDS.teamA}`)
+    expect(await screen.findAllByRole('link', { name: 'Open' })).toHaveLength(3)
+    expect(screen.getByText('Team options unavailable.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Team')).toHaveValue(UUIDS.teamA)
   })
 })
 

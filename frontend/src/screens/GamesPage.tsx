@@ -31,6 +31,24 @@ export function GamesPage() {
 const features = tableFeatures({})
 const column = createColumnHelper<typeof features, GameSummary>()
 
+function DiscoveryMessage({
+  label,
+  error,
+  retry,
+}: {
+  label: string
+  error: unknown
+  retry: () => void
+}) {
+  if (!error) return null
+  return (
+    <span className="mt-1 flex items-center gap-2 text-xs text-destructive" role="alert">
+      {label} options unavailable.
+      <button className="font-medium underline underline-offset-2" onClick={retry} type="button">Retry</button>
+    </span>
+  )
+}
+
 function GamesContent({ params }: { params: GamesParams }) {
   const games = useGames(params)
   const seasons = useSeasons({ page_size: 100 })
@@ -71,6 +89,8 @@ function GamesContent({ params }: { params: GamesParams }) {
   const size = params.page_size ?? 25
   const pageCount = games.data ? Math.max(1, Math.ceil(games.data.count / size)) : 1
   const partial = games.data?.results.some((game) => game.hr_count.state === 'UNKNOWN' || game.hr_count.state === 'INCOMPLETE')
+  const selectedSeasonKnown = seasons.data?.results.some((season) => season.year === params.season)
+  const selectedTeamKnown = teams.data?.results.some((team) => team.id === params.team)
 
   return (
     <div className="space-y-7">
@@ -80,24 +100,30 @@ function GamesContent({ params }: { params: GamesParams }) {
       </header>
 
       <section aria-label="Game filters" className="grid gap-3 rounded-xl border bg-muted/30 p-4 sm:grid-cols-2 lg:grid-cols-5">
-        <label className="text-sm font-medium">Season
-          <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => change('season', event.target.value || null)} value={params.season ?? ''}>
-            <option value="">All seasons</option>
+        <div>
+          <label className="text-sm font-medium" htmlFor="games-season">Season</label>
+          <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" id="games-season" onChange={(event) => change('season', event.target.value || null)} value={params.season ?? ''}>
+            <option value="">{seasons.isPending ? 'Loading seasons…' : seasons.error ? 'Season options unavailable' : 'All seasons'}</option>
+            {params.season && !selectedSeasonKnown ? <option value={params.season}>Selected season: {params.season}</option> : null}
             {seasons.data?.results.map((season) => <option key={season.id} value={season.year}>{season.label ?? season.year}</option>)}
           </select>
-        </label>
+          <DiscoveryMessage error={seasons.error} label="Season" retry={() => void seasons.refetch()} />
+        </div>
         <label className="text-sm font-medium">From
           <input className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => change('date_from', event.target.value || null)} type="date" value={params.date_from ?? ''} />
         </label>
         <label className="text-sm font-medium">To
           <input className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => change('date_to', event.target.value || null)} type="date" value={params.date_to ?? ''} />
         </label>
-        <label className="text-sm font-medium">Team
-          <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => change('team', event.target.value || null)} value={params.team ?? ''}>
-            <option value="">All teams</option>
+        <div>
+          <label className="text-sm font-medium" htmlFor="games-team">Team</label>
+          <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" id="games-team" onChange={(event) => change('team', event.target.value || null)} value={params.team ?? ''}>
+            <option value="">{teams.isPending ? 'Loading teams…' : teams.error ? 'Team options unavailable' : 'All teams'}</option>
+            {params.team && !selectedTeamKnown ? <option value={params.team}>Selected team</option> : null}
             {teams.data?.results.map((team) => <option key={team.id} value={team.id}>{team.display_name ?? team.abbreviation ?? 'Unknown team'}</option>)}
           </select>
-        </label>
+          <DiscoveryMessage error={teams.error} label="Team" retry={() => void teams.refetch()} />
+        </div>
         <label className="text-sm font-medium">Status
           <select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => change('status', event.target.value || null)} value={params.status ?? ''}>
             <option value="">All statuses</option>

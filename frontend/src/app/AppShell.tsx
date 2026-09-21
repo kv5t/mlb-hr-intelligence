@@ -60,10 +60,10 @@ export function AppShell() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 md:pb-8" id="main-content" tabIndex={-1}>
+      <main className="mx-auto max-w-7xl px-4 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 md:pb-8" id="main-content" tabIndex={-1}>
         <Outlet />
       </main>
-      <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-2 md:hidden">
+      <nav aria-label="Mobile primary" className="fixed inset-x-0 bottom-0 z-40 border-t bg-background p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
           {core.slice(0, 4).map(([label, to]) => <CoreLink key={to} label={label} to={to} />)}
           <div className="relative">
