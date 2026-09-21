@@ -27,6 +27,7 @@ from .services import (
     schedule_date,
     today_coverage,
     today_games,
+    today_leader_population_availability,
     today_leaders,
 )
 
@@ -114,6 +115,24 @@ def _ordering(raw, allowed, default):
     ]
 
 
+def _affiliations_for_season(season):
+    affiliations = PlayerTeamAffiliation.objects.all()
+    if season.starts_on and season.ends_on:
+        return affiliations.filter(
+            Q(season=season)
+            | Q(season__isnull=True)
+            & (
+                Q(effective_from_date__isnull=True)
+                | Q(effective_from_date__lte=season.ends_on)
+            )
+            & (
+                Q(effective_to_date_exclusive__isnull=True)
+                | Q(effective_to_date_exclusive__gt=season.starts_on)
+            )
+        )
+    return affiliations.filter(season=season)
+
+
 class SeasonsView(ReadOnlyView):
     def get(self, request):
         _parameters(request, {"page", "page_size"})
@@ -152,9 +171,7 @@ class TeamsView(ReadOnlyView):
                 )
             )
             ids.update(
-                PlayerTeamAffiliation.objects.filter(season=season).values_list(
-                    "team_id", flat=True
-                )
+                _affiliations_for_season(season).values_list("team_id", flat=True)
             )
             queryset = queryset.filter(id__in=ids)
         for name in ("league", "division"):
@@ -203,24 +220,7 @@ class PlayersView(ReadOnlyView):
             if season:
                 participations = participations.filter(game__season=season)
                 pas = pas.filter(game__season=season)
-                affiliations = (
-                    affiliations.filter(
-                        Q(season=season)
-                        | Q(
-                            season__isnull=True,
-                        )
-                        & (
-                            Q(effective_from_date__isnull=True)
-                            | Q(effective_from_date__lte=season.ends_on)
-                        )
-                        & (
-                            Q(effective_to_date_exclusive__isnull=True)
-                            | Q(effective_to_date_exclusive__gt=season.starts_on)
-                        )
-                    )
-                    if season.starts_on and season.ends_on
-                    else affiliations.filter(season=season)
-                )
+                affiliations = _affiliations_for_season(season)
             if team:
                 participations = participations.filter(team=team)
                 pas = pas.filter(batting_team=team)
@@ -369,16 +369,18 @@ class TodayView(ReadOnlyView):
             )
         )
         leaders = today_leaders(season, day, window)
+        population_availability = today_leader_population_availability(season, day)
         leader_states = [row["metrics"]["player.hr"]["state"] for row in leaders]
+        combined_states = [population_availability["state"], *leader_states]
         availability = (
             "NOT_APPLICABLE"
-            if not leader_states
+            if population_availability["state"] == "NOT_APPLICABLE"
             else "UNKNOWN"
-            if "UNKNOWN" in leader_states
+            if "UNKNOWN" in combined_states
             else "INCOMPLETE"
-            if "INCOMPLETE" in leader_states
+            if "INCOMPLETE" in combined_states
             else "ORDER_UNVERIFIED"
-            if "ORDER_UNVERIFIED" in leader_states
+            if "ORDER_UNVERIFIED" in combined_states
             else "VALUE"
         )
         return Response(
@@ -388,7 +390,11 @@ class TodayView(ReadOnlyView):
                 "recent_leaders": leaders,
                 "recent_leaders_availability": {
                     "state": availability,
-                    "reason": "NO_GAMES" if not leaders else None,
+                    "reason": population_availability["reason"]
+                    if population_availability["state"] != "VALUE"
+                    else "LEADER_METRIC_UNAVAILABLE"
+                    if availability != "VALUE"
+                    else None,
                 },
                 "scope": {
                     "season": season.year,

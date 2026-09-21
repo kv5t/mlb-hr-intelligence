@@ -286,6 +286,60 @@ def today_leaders(season, day, window):
     return rows[:5]
 
 
+def today_leader_population_availability(season, day):
+    """Assess whether every possible batting/HR contributor is represented.
+
+    Observed player rows can still be useful when this gate is unavailable;
+    this result describes the completeness of the ranking population itself.
+    """
+    candidates = Game.objects.filter(
+        season=season,
+        game_type=Game.Type.REGULAR,
+        finality=Game.Finality.FINAL,
+    )
+    if candidates.filter(official_date__isnull=True).exists():
+        return {"state": "UNKNOWN", "reason": "OFFICIAL_DATE_UNKNOWN"}
+
+    game_ids = list(
+        candidates.filter(official_date__lte=day).values_list("id", flat=True)
+    )
+    if not game_ids:
+        return {"state": "NOT_APPLICABLE", "reason": "NO_GAMES"}
+
+    rows = {
+        (row.game_id, row.domain): row
+        for row in GameDataCoverage.objects.filter(
+            game_id__in=game_ids,
+            domain__in=(
+                GameDataCoverage.Domain.PLATE_APPEARANCES,
+                GameDataCoverage.Domain.HR_EVENTS,
+            ),
+        )
+    }
+    saw_partial = False
+    for game_id in game_ids:
+        for domain in (
+            GameDataCoverage.Domain.PLATE_APPEARANCES,
+            GameDataCoverage.Domain.HR_EVENTS,
+        ):
+            row = rows.get((game_id, domain))
+            if row is None or row.state in (
+                GameDataCoverage.State.UNKNOWN,
+                GameDataCoverage.State.UNAVAILABLE,
+            ):
+                return {
+                    "state": "UNKNOWN",
+                    "reason": row.reason_code
+                    if row and row.reason_code
+                    else "LEADER_POPULATION_UNVERIFIED",
+                }
+            if row.state == GameDataCoverage.State.PARTIAL:
+                saw_partial = True
+    if saw_partial:
+        return {"state": "INCOMPLETE", "reason": "LEADER_POPULATION_INCOMPLETE"}
+    return {"state": "VALUE", "reason": None}
+
+
 def today_coverage(games):
     """Conservative current projection across listed schedule games."""
     if not games:

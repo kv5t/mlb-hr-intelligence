@@ -14,6 +14,8 @@ from domain.models import (
     GameDataCoverage,
     PlateAppearance,
     Player,
+    PlayerGameParticipation,
+    PlayerTeamAffiliation,
     Season,
     Team,
 )
@@ -47,6 +49,66 @@ class ApiContractTests(TestCase):
 
     def game(self, key):
         return Game.objects.get(pk=self.fixture.game_ids[key])
+
+    def save_valid(self, instance):
+        instance.full_clean()
+        instance.save()
+        return instance
+
+    def make_leader_season(self, year):
+        season = self.save_valid(
+            Season(
+                id=fixture_uuid(f"b12:season:{year}"),
+                year=year,
+                label=f"Synthetic {year}",
+                starts_on=date(year, 4, 1),
+                ends_on=date(year, 10, 31),
+            )
+        )
+        home = self.save_valid(
+            Team(
+                id=fixture_uuid(f"b12:team:{year}:home"),
+                display_name=f"Synthetic {year} Home",
+            )
+        )
+        away = self.save_valid(
+            Team(
+                id=fixture_uuid(f"b12:team:{year}:away"),
+                display_name=f"Synthetic {year} Away",
+            )
+        )
+        player = self.save_valid(
+            Player(
+                id=fixture_uuid(f"b12:player:{year}"),
+                display_name=f"Fixture Leader {year}",
+            )
+        )
+        return season, home, away, player
+
+    def make_final_game(self, season, home, away, key, day):
+        return self.save_valid(
+            Game(
+                id=fixture_uuid(key),
+                season=season,
+                home_team=home,
+                away_team=away,
+                official_date=day,
+                game_type=Game.Type.REGULAR,
+                status=Game.Status.COMPLETED,
+                finality=Game.Finality.FINAL,
+            )
+        )
+
+    def set_coverage(self, game, domain, state):
+        return self.save_valid(
+            GameDataCoverage(
+                id=fixture_uuid(f"b12:coverage:{game.id}:{domain}"),
+                game=game,
+                domain=domain,
+                state=state,
+                assessed_at_utc=datetime(2099, 1, 1, tzinfo=timezone.utc),
+            )
+        )
 
     def assert_meta(self, response):
         self.assertEqual(
@@ -142,6 +204,76 @@ class ApiContractTests(TestCase):
         self.assertGreater(
             self.client.get("/api/v1/teams/?season=2099").json()["count"], 0
         )
+
+    def test_team_season_discovery_uses_verified_affiliation_overlap(self):
+        self.season.starts_on = date(2099, 4, 1)
+        self.season.ends_on = date(2099, 10, 31)
+        self.season.save()
+        explicit = self.save_valid(
+            Team(id=fixture_uuid("b12:explicit-team"), display_name="Explicit Team")
+        )
+        overlap = self.save_valid(
+            Team(id=fixture_uuid("b12:overlap-team"), display_name="Overlap Team")
+        )
+        ended = self.save_valid(
+            Team(id=fixture_uuid("b12:ended-team"), display_name="Ended Team")
+        )
+        self.save_valid(
+            PlayerTeamAffiliation(
+                id=fixture_uuid("b12:explicit-affiliation"),
+                player=self.slugger,
+                team=explicit,
+                season=self.season,
+            )
+        )
+        self.save_valid(
+            PlayerTeamAffiliation(
+                id=fixture_uuid("b12:overlap-affiliation"),
+                player=self.slugger,
+                team=overlap,
+                effective_from_date=date(2099, 5, 1),
+                effective_to_date_exclusive=date(2099, 6, 1),
+                boundary_precision=PlayerTeamAffiliation.BoundaryPrecision.DATE,
+            )
+        )
+        self.save_valid(
+            PlayerTeamAffiliation(
+                id=fixture_uuid("b12:ended-affiliation"),
+                player=self.slugger,
+                team=ended,
+                effective_from_date=date(2098, 4, 1),
+                effective_to_date_exclusive=date(2099, 1, 1),
+                boundary_precision=PlayerTeamAffiliation.BoundaryPrecision.DATE,
+            )
+        )
+        ids = {
+            row["id"]
+            for row in self.client.get("/api/v1/teams/?season=2099").json()["results"]
+        }
+        self.assertIn(str(explicit.id), ids)
+        self.assertIn(str(overlap.id), ids)
+        self.assertNotIn(str(ended.id), ids)
+
+        unknown = self.save_valid(
+            Season(id=fixture_uuid("b12:unknown-calendar"), year=2096)
+        )
+        uncertain = self.save_valid(
+            Team(id=fixture_uuid("b12:uncertain-team"), display_name="Uncertain Team")
+        )
+        self.save_valid(
+            PlayerTeamAffiliation(
+                id=fixture_uuid("b12:uncertain-affiliation"),
+                player=self.slugger,
+                team=uncertain,
+                effective_from_date=date(2096, 5, 1),
+                boundary_precision=PlayerTeamAffiliation.BoundaryPrecision.DATE,
+            )
+        )
+        unknown_response = self.client.get(
+            f"/api/v1/teams/?season={unknown.year}"
+        ).json()
+        unknown_ids = {row["id"] for row in unknown_response["results"]}
+        self.assertNotIn(str(uncertain.id), unknown_ids)
 
     def test_players_are_discovery_only_with_known_team_association(self):
         self.slugger.primary_position = "1B"
@@ -404,3 +536,89 @@ class ApiContractTests(TestCase):
             game for game in scheduled["games"] if game["id"] == str(nonfinal.id)
         )
         self.assertEqual(row["hr_count"]["state"], "UNKNOWN")
+
+    def test_today_leader_availability_gates_the_complete_population(self):
+        for year, uncertain_state, expected in (
+            (2095, GameDataCoverage.State.UNKNOWN, "UNKNOWN"),
+            (2094, GameDataCoverage.State.PARTIAL, "INCOMPLETE"),
+            (2093, GameDataCoverage.State.COMPLETE, "VALUE"),
+        ):
+            with self.subTest(expected=expected):
+                season, home, away, player = self.make_leader_season(year)
+                observed = self.make_final_game(
+                    season, home, away, f"b12:{year}:observed", date(year, 4, 2)
+                )
+                self.save_valid(
+                    PlayerGameParticipation(
+                        id=fixture_uuid(f"b12:{year}:participation"),
+                        game=observed,
+                        player=player,
+                        team=home,
+                        participation_state=PlayerGameParticipation.State.APPEARED,
+                        reported_pa_count=1,
+                        pa_coverage=PlayerGameParticipation.Coverage.COMPLETE,
+                    )
+                )
+                self.save_valid(
+                    PlateAppearance(
+                        id=fixture_uuid(f"b12:{year}:pa"),
+                        game=observed,
+                        batter=player,
+                        batting_team=home,
+                        fielding_team=away,
+                        game_pa_ordinal=1,
+                        outcome_category=PlateAppearance.Outcome.NON_HR,
+                    )
+                )
+                for domain in (
+                    GameDataCoverage.Domain.PARTICIPATION,
+                    GameDataCoverage.Domain.PLATE_APPEARANCES,
+                    GameDataCoverage.Domain.HR_EVENTS,
+                ):
+                    self.set_coverage(observed, domain, GameDataCoverage.State.COMPLETE)
+                population_game = self.make_final_game(
+                    season, home, away, f"b12:{year}:population", date(year, 4, 3)
+                )
+                self.set_coverage(
+                    population_game,
+                    GameDataCoverage.Domain.PLATE_APPEARANCES,
+                    uncertain_state,
+                )
+                self.set_coverage(
+                    population_game,
+                    GameDataCoverage.Domain.HR_EVENTS,
+                    uncertain_state,
+                )
+                response = self.client.get(
+                    f"/api/v1/today/?season={year}&date={year}-04-03"
+                )
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertTrue(data["recent_leaders"])
+                self.assertEqual(
+                    data["recent_leaders"][0]["metrics"]["player.hr"]["state"],
+                    "VALUE",
+                )
+                self.assertEqual(data["recent_leaders_availability"]["state"], expected)
+
+    def test_today_leader_availability_no_final_games_is_not_applicable(self):
+        season, _, _, _ = self.make_leader_season(2092)
+        response = self.client.get(
+            f"/api/v1/today/?season={season.year}&date={season.year}-04-03"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["recent_leaders_availability"],
+            {"state": "NOT_APPLICABLE", "reason": "NO_GAMES"},
+        )
+
+    def test_today_leader_availability_unknown_official_date_is_unknown(self):
+        season, home, away, _ = self.make_leader_season(2091)
+        self.make_final_game(season, home, away, "b12:2091:unknown-date", None)
+        response = self.client.get(
+            f"/api/v1/today/?season={season.year}&date={season.year}-04-03"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()["recent_leaders_availability"]["state"], "UNKNOWN"
+        )
