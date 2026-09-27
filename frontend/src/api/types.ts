@@ -9,6 +9,8 @@ import type {
   metricValueSchema,
   playerSummarySchema,
   playersResponseSchema,
+  leaderboardRowSchema,
+  playerLeaderboardResponseSchema,
   seasonSummarySchema,
   seasonsResponseSchema,
   teamSummarySchema,
@@ -27,5 +29,7 @@ export type GameDetail = z.infer<typeof gameDetailSchema>
 export type SeasonsResponse = z.infer<typeof seasonsResponseSchema>
 export type TeamsResponse = z.infer<typeof teamsResponseSchema>
 export type PlayersResponse = z.infer<typeof playersResponseSchema>
+export type LeaderboardRow = z.infer<typeof leaderboardRowSchema>
+export type PlayerLeaderboardResponse = z.infer<typeof playerLeaderboardResponseSchema>
 export type GamesResponse = z.infer<typeof gamesResponseSchema>
 export type TodayResponse = z.infer<typeof todayResponseSchema>

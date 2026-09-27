@@ -39,6 +39,7 @@ from .services import (
     player_metrics,
     public_game,
     public_home_run_events,
+    represented_team_for_selection,
     schedule_date,
     selection_coverage,
     today_coverage,
@@ -160,11 +161,34 @@ def _team(raw):
     return team
 
 
-def _player_candidates(season, team=None, *, search=None, position=None, bats=None):
+def _player_candidates(
+    season, team=None, *, cutoff="LATEST", search=None, position=None, bats=None
+):
     """Source-supported season identities; this is not a roster claim."""
     participations = PlayerGameParticipation.objects.filter(game__season=season)
     pas = PlateAppearance.objects.filter(game__season=season)
     affiliations = _affiliations_for_season(season)
+    if cutoff != "LATEST":
+        eligible = {
+            "game__game_type": Game.Type.REGULAR,
+            "game__finality": Game.Finality.FINAL,
+        }
+        date_scope = Q(game__official_date__lte=cutoff) | Q(
+            game__official_date__isnull=True
+        )
+        participations = participations.filter(date_scope, **eligible)
+        pas = pas.filter(date_scope, **eligible)
+        if season.starts_on is not None and cutoff < season.starts_on:
+            affiliations = affiliations.none()
+        else:
+            affiliations = affiliations.filter(
+                Q(effective_from_date__isnull=True) | Q(effective_from_date__lte=cutoff)
+            )
+            if season.starts_on is not None:
+                affiliations = affiliations.filter(
+                    Q(effective_to_date_exclusive__isnull=True)
+                    | Q(effective_to_date_exclusive__gt=season.starts_on)
+                )
     if team is not None:
         participations = participations.filter(team=team)
         pas = pas.filter(batting_team=team)
@@ -421,6 +445,7 @@ class PlayerLeaderboardView(ReadOnlyView):
         candidates = _player_candidates(
             season,
             team,
+            cutoff=cutoff,
             search=request.query_params.get("search"),
             position=request.query_params.get("position"),
             bats=request.query_params.get("bats"),
@@ -472,7 +497,7 @@ class PlayerHomeRunsView(ReadOnlyView):
         player = Player.objects.filter(pk=_uuid(id, "id", path=True)).first()
         if player is None:
             raise NotFound()
-        ordering = request.query_params.get("ordering", "-official_date")
+        ordering = request.query_params.get("ordering", "official_date")
         if ordering not in ("official_date", "-official_date"):
             raise ApiProblem(
                 "INVALID_FILTER",
@@ -505,7 +530,9 @@ class PlayerHomeRunsView(ReadOnlyView):
         page["results"] = public_home_run_events(page["results"])
         page.update(
             {
-                "player": player_summary(player, team),
+                "player": player_summary(
+                    player, represented_team_for_selection(selection, team)
+                ),
                 "total_hr": player_metrics(selection)["player.hr"],
                 "scope": _scope(selection),
                 "coverage": selection_coverage(selection),

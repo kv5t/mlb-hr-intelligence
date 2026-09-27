@@ -4,11 +4,13 @@ import { apiGet } from './client'
 import {
   normalizeGamesParams,
   normalizePlayersParams,
+  normalizePlayerLeaderboardParams,
   normalizeSeasonsParams,
   normalizeTeamsParams,
   normalizeTodayParams,
   type GamesParams,
   type PlayersParams,
+  type PlayerLeaderboardParams,
   type SeasonsParams,
   type TeamsParams,
   type TodayParams,
@@ -18,6 +20,7 @@ import {
   gameDetailSchema,
   gamesResponseSchema,
   playersResponseSchema,
+  playerLeaderboardResponseSchema,
   seasonsResponseSchema,
   teamsResponseSchema,
   todayResponseSchema,
@@ -48,6 +51,20 @@ export function usePlayers(params: PlayersParams = {}) {
   return useQuery({
     queryKey: queryKeys.players(normalized),
     queryFn: ({ signal }) => apiGet({ path: 'players/', params: normalized, schema: playersResponseSchema, signal }),
+    staleTime,
+  })
+}
+
+export function usePlayerLeaderboard(params: PlayerLeaderboardParams) {
+  const normalized = normalizePlayerLeaderboardParams(params)
+  return useQuery({
+    queryKey: queryKeys.playerLeaderboard(normalized),
+    queryFn: ({ signal }) => apiGet({
+      path: 'leaderboards/players/',
+      params: normalized,
+      schema: playerLeaderboardResponseSchema,
+      signal,
+    }),
     staleTime,
   })
 }

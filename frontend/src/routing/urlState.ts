@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
-import { GAME_ORDERINGS, GAME_STATUSES, WINDOWS } from '@/api/params'
+import {
+  GAME_ORDERINGS,
+  GAME_STATUSES,
+  PLAYER_LEADERBOARD_ORDERINGS,
+  WINDOWS,
+} from '@/api/params'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const parsed = new Date(`${value}T00:00:00Z`)
@@ -24,7 +29,7 @@ const definitions = {
   status: z.enum(GAME_STATUSES),
 } as const
 
-export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'generic'
+export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'generic'
 export type UrlStateKey = keyof typeof definitions
 
 const routeDefinitions: Record<
@@ -43,6 +48,32 @@ const routeDefinitions: Record<
     page_size: definitions.page_size,
   },
   gameDetail: {},
+  league: {
+    season: definitions.season,
+    window: definitions.window,
+    cutoff: definitions.cutoff,
+    team: definitions.team,
+    home_away: definitions.home_away,
+    search: definitions.search,
+    position: definitions.position,
+    bats: definitions.bats,
+    ordering: z.enum(PLAYER_LEADERBOARD_ORDERINGS),
+    page: definitions.page,
+    page_size: definitions.page_size,
+  },
+  players: {
+    season: definitions.season,
+    window: definitions.window,
+    cutoff: definitions.cutoff,
+    team: definitions.team,
+    home_away: definitions.home_away,
+    search: definitions.search,
+    position: definitions.position,
+    bats: definitions.bats,
+    ordering: z.enum(PLAYER_LEADERBOARD_ORDERINGS),
+    page: definitions.page,
+    page_size: definitions.page_size,
+  },
   generic: definitions,
 }
 

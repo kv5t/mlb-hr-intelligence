@@ -18,6 +18,19 @@ export const GAME_ORDERINGS = [
   'scheduled_start_at_utc',
   '-scheduled_start_at_utc',
 ] as const
+export const HOME_AWAY = ['ALL', 'HOME', 'AWAY'] as const
+export const PLAYER_LEADERBOARD_ORDERINGS = [
+  'name', '-name',
+  'hr', '-hr',
+  'pa', '-pa',
+  'hr_per_pa', '-hr_per_pa',
+  'pa_per_hr', '-pa_per_hr',
+  'hr_per_game', '-hr_per_game',
+  'hr_game_pct', '-hr_game_pct',
+  'median_hr_gap_games', '-median_hr_gap_games',
+  'current_hr_drought_games', '-current_hr_drought_games',
+  'current_hr_streak_games', '-current_hr_streak_games',
+] as const
 
 const pageFields = {
   page: z.number().int().positive().optional(),
@@ -65,12 +78,25 @@ export const todayParamsSchema = z.object({
   date,
   window: z.enum(WINDOWS).optional(),
 })
+export const playerLeaderboardParamsSchema = z.object({
+  season: year,
+  window: z.enum(WINDOWS).optional(),
+  team: uuid.optional(),
+  home_away: z.enum(HOME_AWAY).optional(),
+  cutoff: date.optional(),
+  search: text.optional(),
+  position: text.optional(),
+  bats: z.enum(['L', 'R', 'S', 'UNKNOWN']).optional(),
+  ordering: z.enum(PLAYER_LEADERBOARD_ORDERINGS).optional(),
+  ...pageFields,
+})
 
 export type SeasonsParams = z.input<typeof seasonsParamsSchema>
 export type TeamsParams = z.input<typeof teamsParamsSchema>
 export type PlayersParams = z.input<typeof playersParamsSchema>
 export type GamesParams = z.input<typeof gamesParamsSchema>
 export type TodayParams = z.input<typeof todayParamsSchema>
+export type PlayerLeaderboardParams = z.input<typeof playerLeaderboardParamsSchema>
 
 type ParamsSchema = z.ZodObject<z.ZodRawShape>
 
@@ -86,6 +112,8 @@ export const normalizeTeamsParams = (value: unknown = {}) => normalize(teamsPara
 export const normalizePlayersParams = (value: unknown = {}) => normalize(playersParamsSchema, value)
 export const normalizeGamesParams = (value: unknown = {}) => normalize(gamesParamsSchema, value)
 export const normalizeTodayParams = (value: unknown) => normalize(todayParamsSchema, value)
+export const normalizePlayerLeaderboardParams = (value: unknown) =>
+  normalize(playerLeaderboardParamsSchema, value)
 
 export function queryString(params: Record<string, unknown>): string {
   const query = new URLSearchParams()

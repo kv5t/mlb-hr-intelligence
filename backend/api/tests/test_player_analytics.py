@@ -1,6 +1,6 @@
 """B14 player analytics, leaderboard and verified home-run log contracts."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from django.test import TestCase
@@ -8,9 +8,11 @@ from rest_framework.test import APIClient
 
 from domain.fixtures import fixture_uuid, load_synthetic_fixtures
 from domain.models import (
+    Game,
     GameDataCoverage,
     Player,
     PlayerGameParticipation,
+    PlayerTeamAffiliation,
     Season,
     Team,
 )
@@ -43,6 +45,11 @@ class PlayerAnalyticsApiTests(TestCase):
 
     def leaderboard(self, query="season=2099"):
         return self.client.get(f"/api/v1/leaderboards/players/?{query}")
+
+    def save_valid(self, instance):
+        instance.full_clean()
+        instance.save()
+        return instance
 
     def test_player_detail_requires_season_and_missing_player_is_404(self):
         self.assertEqual(self.detail(query="").status_code, 400)
@@ -193,6 +200,93 @@ class PlayerAnalyticsApiTests(TestCase):
         self.assertEqual(slugger["player"]["represented_team"]["id"], str(self.b.id))
         self.assertEqual(slugger["scope"]["team_filter_id"], str(self.b.id))
 
+    def test_represented_team_requires_positive_selected_evidence(self):
+        unrelated = Team.objects.get(pk=self.fixture.team_ids["c"])
+        unrelated_body = self.detail(
+            query=f"season=2099&team={unrelated.id}&cutoff=2099-04-03"
+        ).json()
+        self.assertIsNone(unrelated_body["player"]["represented_team"])
+
+        before_join = self.detail(
+            query=f"season=2099&team={self.b.id}&cutoff=2099-04-03"
+        ).json()
+        self.assertIsNone(before_join["player"]["represented_team"])
+
+        evidenced = self.detail(
+            query=f"season=2099&team={self.b.id}&cutoff=2099-04-13"
+        ).json()
+        self.assertEqual(evidenced["player"]["represented_team"]["id"], str(self.b.id))
+        unfiltered = self.detail(query="season=2099&cutoff=2099-04-14").json()
+        self.assertIsNone(unfiltered["player"]["represented_team"])
+
+    def test_historical_cutoff_excludes_future_only_candidates(self):
+        future = self.save_valid(
+            Player(
+                id=fixture_uuid("b15:future-player"),
+                display_name="Fixture Future Player",
+            )
+        )
+        self.save_valid(
+            PlayerTeamAffiliation(
+                id=fixture_uuid("b15:future-affiliation"),
+                player=future,
+                team=self.b,
+                season=self.season,
+                effective_from_date=date(2099, 6, 1),
+                boundary_precision=PlayerTeamAffiliation.BoundaryPrecision.DATE,
+            )
+        )
+        queries = (
+            ("season=2099&cutoff=2099-04-03", True),
+            (f"season=2099&team={self.b.id}&cutoff=2099-04-03", False),
+        )
+        for query, slugger_expected in queries:
+            with self.subTest(query=query):
+                ids = {
+                    row["player"]["id"]
+                    for row in self.leaderboard(query).json()["results"]
+                }
+                self.assertNotIn(str(future.id), ids)
+                self.assertEqual(str(self.slugger.id) in ids, slugger_expected)
+
+    def test_historical_cutoff_keeps_unknown_date_candidate_conservative(self):
+        player = self.save_valid(
+            Player(
+                id=fixture_uuid("b15:unknown-date-player"),
+                display_name="Fixture Unknown Date Player",
+            )
+        )
+        game = self.save_valid(
+            Game(
+                id=fixture_uuid("b15:unknown-date-game"),
+                season=self.season,
+                home_team=self.a,
+                away_team=self.b,
+                game_type=Game.Type.REGULAR,
+                status=Game.Status.COMPLETED,
+                finality=Game.Finality.FINAL,
+                official_date=None,
+            )
+        )
+        self.save_valid(
+            PlayerGameParticipation(
+                id=fixture_uuid("b15:unknown-date-participation"),
+                game=game,
+                player=player,
+                team=self.a,
+                participation_state=PlayerGameParticipation.State.APPEARED,
+                pa_coverage=PlayerGameParticipation.Coverage.COMPLETE,
+                reported_pa_count=0,
+            )
+        )
+        ids = {
+            row["player"]["id"]
+            for row in self.leaderboard("season=2099&cutoff=2099-04-03").json()[
+                "results"
+            ]
+        }
+        self.assertIn(str(player.id), ids)
+
     def test_leaderboard_default_metric_order_and_unavailable_last_both_ways(self):
         default = self.leaderboard("season=2099&cutoff=2099-04-03").json()
         self.assertEqual(default["results"][0]["player"]["id"], str(self.slugger.id))
@@ -331,6 +425,7 @@ class PlayerAnalyticsApiTests(TestCase):
         self.assertIsNone(body["total_hr"]["value"])
 
     def test_hr_log_team_cutoff_ordering_and_trade_attribution(self):
+        default = self.log(f"season=2099&window=7G&team={self.a.id}&cutoff=2099-04-19")
         ascending = self.log(
             f"season=2099&window=7G&team={self.a.id}"
             "&cutoff=2099-04-19&ordering=official_date"
@@ -342,6 +437,10 @@ class PlayerAnalyticsApiTests(TestCase):
         self.assertEqual(ascending.status_code, 200)
         asc_rows = ascending.json()["results"]
         desc_rows = descending.json()["results"]
+        self.assertEqual(
+            [row["id"] for row in default.json()["results"]],
+            [row["id"] for row in asc_rows],
+        )
         self.assertGreaterEqual(len(asc_rows), 2)
         self.assertEqual(
             [row["official_date"] for row in desc_rows],

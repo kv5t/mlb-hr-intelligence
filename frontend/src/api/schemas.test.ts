@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   gamesResponseSchema,
   metricValueSchema,
+  playerLeaderboardResponseSchema,
   seasonsResponseSchema,
   todayResponseSchema,
 } from './schemas'
-import { game, meta, valueMetric } from '@/test/fixtures'
+import { game, meta, player, valueMetric } from '@/test/fixtures'
 
 describe('B11 response schemas', () => {
   it('parses seasons and ignores compatible additive fields', () => {
@@ -69,5 +70,23 @@ describe('B11 response schemas', () => {
       results: [{ ...game, official_date: '2099-99-99' }],
       meta,
     })).toThrow()
+  })
+
+  it('parses B14 leaderboard rows and rejects malformed scope enums', () => {
+    const row = {
+      player,
+      metrics: { 'player.hr': valueMetric },
+      scope: {
+        season: 2099, subject: 'PLAYER', subject_id: player.id, game_type: 'REGULAR',
+        window: '30G', requested_n: 30, cutoff_date: '2099-04-03', cutoff_source: 'EXPLICIT',
+        team_filter_id: null, home_away: 'ALL', selection_state: 'VALUE',
+        actual_game_count: 17, known_eligible_game_count: 17,
+      },
+      coverage: [],
+    }
+    const parsed = playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, compatible_future_field: true }], meta })
+    expect(parsed.results[0].scope.actual_game_count).toBe(17)
+    expect(parsed.results[0]).not.toHaveProperty('compatible_future_field')
+    expect(() => playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, scope: { ...row.scope, selection_state: 'NEW' } }], meta })).toThrow()
   })
 })

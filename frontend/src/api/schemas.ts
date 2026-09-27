@@ -176,8 +176,8 @@ export const windowScopeSchema = z.object({
   game_type: z.literal('REGULAR'),
   window: z.enum(['7G', '15G', '30G', '60G', 'SEASON']),
   requested_n: z.number().int().nullable(),
-  cutoff_date: isoDate,
-  cutoff_source: z.literal('EXPLICIT'),
+  cutoff_date: isoDate.nullable(),
+  cutoff_source: z.enum(['EXPLICIT', 'LATEST']),
 })
 
 export const leaderScopeSchema = windowScopeSchema.extend({
@@ -189,12 +189,15 @@ export const leaderScopeSchema = windowScopeSchema.extend({
   known_eligible_game_count: z.number().int().nonnegative(),
 })
 
-export const todayLeaderSchema = z.object({
+export const leaderboardRowSchema = z.object({
   player: playerSummarySchema,
   metrics: z.record(z.string(), metricValueSchema),
   scope: leaderScopeSchema,
   coverage: z.array(coverageSummarySchema),
 })
+
+export const todayLeaderSchema = leaderboardRowSchema
+export const playerLeaderboardResponseSchema = paginatedSchema(leaderboardRowSchema)
 
 export const todayResponseSchema = z.object({
   date: isoDate,

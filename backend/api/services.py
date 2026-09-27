@@ -298,9 +298,25 @@ def selection_coverage(selection):
     return result
 
 
-def player_analytics_row(player, selection, represented_team=None):
+def represented_team_for_selection(selection, requested_team):
+    """Return a requested team only when positive selected evidence supports it."""
+    if requested_team is None:
+        return None
+    entries = (
+        *selection.entries,
+        *selection.known_core_entries,
+        *(item.entry for item in selection.full_scope_observations if item.entry),
+    )
+    if any(requested_team.id in entry.represented_team_ids for entry in entries):
+        return requested_team
+    return None
+
+
+def player_analytics_row(player, selection, requested_team=None):
     return {
-        "player": player_summary(player, represented_team),
+        "player": player_summary(
+            player, represented_team_for_selection(selection, requested_team)
+        ),
         "metrics": player_metrics(selection),
         "scope": _scope(selection),
         "coverage": selection_coverage(selection),
