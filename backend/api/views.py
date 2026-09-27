@@ -7,6 +7,16 @@ from django.db.models import F, Q
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
+from analytics.windows import (
+    HOME_AWAY,
+    WINDOW_SIZES,
+    Cutoff,
+    MembershipState,
+    OrderState,
+    SelectionError,
+    SelectionResult,
+    select_player_window,
+)
 from domain.models import (
     Game,
     PlateAppearance,
@@ -22,9 +32,15 @@ from .errors import ApiProblem
 from .pagination import paginate
 from .serializers import player_summary, season_summary, team_summary
 from .services import (
+    _scope,
     game_detail,
+    player_analytics_row,
+    player_home_run_events,
+    player_metrics,
     public_game,
+    public_home_run_events,
     schedule_date,
+    selection_coverage,
     today_coverage,
     today_games,
     today_leader_population_availability,
@@ -131,6 +147,105 @@ def _affiliations_for_season(season):
             )
         )
     return affiliations.filter(season=season)
+
+
+def _team(raw):
+    if raw is None:
+        return None
+    team = Team.objects.filter(pk=_uuid(raw, "team")).first()
+    if team is None:
+        raise ApiProblem(
+            "INVALID_FILTER", "Unknown team", details={"team": "not found"}
+        )
+    return team
+
+
+def _player_candidates(season, team=None, *, search=None, position=None, bats=None):
+    """Source-supported season identities; this is not a roster claim."""
+    participations = PlayerGameParticipation.objects.filter(game__season=season)
+    pas = PlateAppearance.objects.filter(game__season=season)
+    affiliations = _affiliations_for_season(season)
+    if team is not None:
+        participations = participations.filter(team=team)
+        pas = pas.filter(batting_team=team)
+        affiliations = affiliations.filter(team=team)
+    ids = set(participations.values_list("player_id", flat=True))
+    ids.update(pas.values_list("batter_id", flat=True))
+    ids.update(affiliations.values_list("player_id", flat=True))
+    queryset = Player.objects.filter(id__in=ids)
+    if search:
+        queryset = queryset.filter(display_name__icontains=search)
+    if position:
+        queryset = queryset.filter(primary_position__iexact=position)
+    if bats:
+        if bats not in Player.Bats.values:
+            raise ApiProblem(
+                "INVALID_FILTER", "Invalid bats", details={"bats": "unsupported"}
+            )
+        queryset = queryset.filter(bats=bats)
+    return queryset.order_by("id")
+
+
+def _analytical_inputs(request):
+    season = _year(request.query_params.get("season"), required=True)
+    window = request.query_params.get("window", "SEASON")
+    if window not in WINDOW_SIZES:
+        raise ApiProblem(
+            "INVALID_FILTER", "Invalid window", details={"window": "unsupported"}
+        )
+    home_away = request.query_params.get("home_away", "ALL")
+    if home_away not in HOME_AWAY:
+        raise ApiProblem(
+            "INVALID_FILTER",
+            "Invalid home_away",
+            details={"home_away": "unsupported"},
+        )
+    team = _team(request.query_params.get("team"))
+    cutoff = _date(request.query_params.get("cutoff"), "cutoff") or "LATEST"
+    return season, window, team, home_away, cutoff
+
+
+def _select_player(*, player, season, window, team, home_away, cutoff):
+    try:
+        return select_player_window(
+            season=season,
+            player=player,
+            window=window,
+            represented_team=team,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+    except SelectionError as error:
+        if error.code == "NO_FINAL_REGULAR_GAME" and cutoff == "LATEST":
+            # A valid canonical player remains a 200 resource even before a
+            # latest analytical cutoff can be established for the scope.
+            return SelectionResult(
+                subject_kind="PLAYER",
+                subject_id=player.id,
+                season_id=season.id,
+                season_year=season.year,
+                window=window,
+                requested_n=WINDOW_SIZES[window],
+                team_filter_id=team.id if team else None,
+                home_away=home_away,
+                cutoff_request=Cutoff.latest(),
+                resolved_cutoff=None,
+                membership_state=MembershipState.UNKNOWN,
+                order_state=OrderState.UNKNOWN,
+                entries=(),
+                known_core_entries=(),
+                known_eligible_game_count=0,
+                actual_game_count=None,
+                ambiguous_candidate_ids=(),
+                uncertain_candidate_ids=(),
+                unverified_order_groups=(),
+                full_scope_observations=(),
+            )
+        raise ApiProblem(
+            "INVALID_FILTER",
+            "Invalid analytical scope",
+            details={"scope": error.code},
+        ) from error
 
 
 class SeasonsView(ReadOnlyView):
@@ -252,6 +367,151 @@ class PlayersView(ReadOnlyView):
                 lambda player: player_summary(player, team),
             )
         )
+
+
+_PLAYER_ANALYTICAL_PARAMETERS = {"season", "window", "team", "home_away", "cutoff"}
+_LEADERBOARD_ORDERING = {
+    "hr": "player.hr",
+    "pa": "player.pa",
+    "hr_per_pa": "player.hr_per_pa",
+    "pa_per_hr": "player.pa_per_hr",
+    "hr_per_game": "player.hr_per_game",
+    "hr_game_pct": "player.hr_game_pct",
+    "median_hr_gap_games": "player.median_hr_gap_games",
+    "current_hr_drought_games": "player.current_hr_drought_games",
+    "current_hr_streak_games": "player.current_hr_streak_games",
+}
+
+
+class PlayerDetailView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(request, _PLAYER_ANALYTICAL_PARAMETERS)
+        player = Player.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if player is None:
+            raise NotFound()
+        season, window, team, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_player(
+            player=player,
+            season=season,
+            window=window,
+            team=team,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        return Response(player_analytics_row(player, selection, team))
+
+
+class PlayerLeaderboardView(ReadOnlyView):
+    def get(self, request):
+        _parameters(
+            request,
+            _PLAYER_ANALYTICAL_PARAMETERS
+            | {"search", "position", "bats", "ordering", "page", "page_size"},
+        )
+        season, window, team, home_away, cutoff = _analytical_inputs(request)
+        raw_ordering = request.query_params.get("ordering", "-hr")
+        descending = raw_ordering.startswith("-")
+        ordering = raw_ordering[1:] if descending else raw_ordering
+        if ordering != "name" and ordering not in _LEADERBOARD_ORDERING:
+            raise ApiProblem(
+                "INVALID_FILTER",
+                "Unsupported ordering",
+                details={"ordering": "unsupported"},
+            )
+        candidates = _player_candidates(
+            season,
+            team,
+            search=request.query_params.get("search"),
+            position=request.query_params.get("position"),
+            bats=request.query_params.get("bats"),
+        )
+        rows = []
+        for player in candidates:
+            selection = _select_player(
+                player=player,
+                season=season,
+                window=window,
+                team=team,
+                home_away=home_away,
+                cutoff=cutoff,
+            )
+            rows.append(player_analytics_row(player, selection, team))
+
+        if ordering == "name":
+            available = [row for row in rows if row["player"]["display_name"]]
+            unavailable = [row for row in rows if not row["player"]["display_name"]]
+            available.sort(key=lambda row: row["player"]["id"])
+            available.sort(
+                key=lambda row: row["player"]["display_name"].casefold(),
+                reverse=descending,
+            )
+            unavailable.sort(key=lambda row: row["player"]["id"])
+            rows = available + unavailable
+        else:
+            metric_id = _LEADERBOARD_ORDERING[ordering]
+            rows.sort(key=lambda row: row["player"]["id"])
+            rows.sort(
+                key=lambda row: (
+                    row["metrics"][metric_id]["state"] != "VALUE",
+                    -row["metrics"][metric_id]["value"]
+                    if descending and row["metrics"][metric_id]["state"] == "VALUE"
+                    else row["metrics"][metric_id]["value"]
+                    if row["metrics"][metric_id]["state"] == "VALUE"
+                    else 0,
+                )
+            )
+        return Response(paginate(request, rows, lambda row: row))
+
+
+class PlayerHomeRunsView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(
+            request,
+            _PLAYER_ANALYTICAL_PARAMETERS | {"ordering", "page", "page_size"},
+        )
+        player = Player.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if player is None:
+            raise NotFound()
+        ordering = request.query_params.get("ordering", "-official_date")
+        if ordering not in ("official_date", "-official_date"):
+            raise ApiProblem(
+                "INVALID_FILTER",
+                "Unsupported ordering",
+                details={"ordering": "unsupported"},
+            )
+        season, window, team, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_player(
+            player=player,
+            season=season,
+            window=window,
+            team=team,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        events = player_home_run_events(selection)
+        if ordering.startswith("-"):
+            game_ranks = {
+                entry.game_id: index for index, entry in enumerate(selection.entries)
+            }
+            events.sort(
+                key=lambda event: (
+                    -game_ranks[event.plate_appearance.game_id],
+                    event.plate_appearance.game_pa_ordinal is None,
+                    event.plate_appearance.game_pa_ordinal or 0,
+                    event.id,
+                )
+            )
+        page = paginate(request, events, lambda event: event)
+        page["results"] = public_home_run_events(page["results"])
+        page.update(
+            {
+                "player": player_summary(player, team),
+                "total_hr": player_metrics(selection)["player.hr"],
+                "scope": _scope(selection),
+                "coverage": selection_coverage(selection),
+            }
+        )
+        return Response(page)
 
 
 def _games_order(raw):

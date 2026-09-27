@@ -1,5 +1,6 @@
 """B11 composition of canonical evidence and existing analytical services."""
 
+from collections import defaultdict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from analytics.coverage import (
@@ -149,6 +150,30 @@ def _safe_event_provenance(event):
     }
 
 
+_LOOK_UP_PROVENANCE = object()
+
+
+def home_run_event_summary(event, provenance=_LOOK_UP_PROVENANCE):
+    """Serialize one reconciled canonical event with public-safe evidence only."""
+    pa = event.plate_appearance
+    game = pa.game
+    return {
+        "id": str(event.id),
+        "game_id": str(game.id),
+        "plate_appearance_id": str(pa.id),
+        "official_date": game.official_date,
+        "batter": player_summary(pa.batter),
+        "pitcher": player_summary(pa.pitcher) if pa.pitcher else None,
+        "batting_team": team_summary(pa.batting_team),
+        "inning": pa.inning,
+        "half_inning": pa.half_inning or "UNKNOWN",
+        "game_pa_ordinal": pa.game_pa_ordinal,
+        "provenance": _safe_event_provenance(event)
+        if provenance is _LOOK_UP_PROVENANCE
+        else provenance,
+    }
+
+
 def game_home_runs(game):
     events = (
         HomeRunEvent.objects.filter(
@@ -164,22 +189,7 @@ def game_home_runs(game):
     )
     result = []
     for event in events:
-        pa = event.plate_appearance
-        result.append(
-            {
-                "id": str(event.id),
-                "game_id": str(game.id),
-                "plate_appearance_id": str(pa.id),
-                "official_date": game.official_date,
-                "batter": player_summary(pa.batter),
-                "pitcher": player_summary(pa.pitcher) if pa.pitcher else None,
-                "batting_team": team_summary(pa.batting_team),
-                "inning": pa.inning,
-                "half_inning": pa.half_inning or "UNKNOWN",
-                "game_pa_ordinal": pa.game_pa_ordinal,
-                "provenance": _safe_event_provenance(event),
-            }
-        )
+        result.append(home_run_event_summary(event))
     return result
 
 
@@ -244,6 +254,114 @@ def _scope(selection):
         "actual_game_count": selection.actual_game_count,
         "known_eligible_game_count": selection.known_eligible_game_count,
     }
+
+
+def player_metrics(selection):
+    """All scalar B09/B10 player metrics for an already selected scope."""
+    metrics = compute_player_production_metrics(selection)
+    metrics.update(compute_player_recurrence(selection).metrics)
+    return {name: metric_value(value) for name, value in metrics.items()}
+
+
+def selection_coverage(selection):
+    """Conservative current coverage projection across selected player games."""
+    game_ids = {entry.game_id for entry in selection.entries}
+    if not game_ids:
+        return []
+    rows = defaultdict(dict)
+    for row in GameDataCoverage.objects.filter(game_id__in=game_ids):
+        rows[row.domain][row.game_id] = row
+    result = []
+    for domain in GameDataCoverage.Domain.values:
+        domain_rows = rows[domain]
+        states = [domain_rows.get(game_id) for game_id in game_ids]
+        if any(
+            row is None
+            or row.state
+            in (GameDataCoverage.State.UNKNOWN, GameDataCoverage.State.UNAVAILABLE)
+            for row in states
+        ):
+            state = GameDataCoverage.State.UNKNOWN
+        elif any(row.state == GameDataCoverage.State.PARTIAL for row in states):
+            state = GameDataCoverage.State.PARTIAL
+        else:
+            state = GameDataCoverage.State.COMPLETE
+        result.append(
+            {
+                "domain": domain,
+                "state": state,
+                "reason_codes": sorted(
+                    {row.reason_code for row in states if row and row.reason_code}
+                ),
+            }
+        )
+    return result
+
+
+def player_analytics_row(player, selection, represented_team=None):
+    return {
+        "player": player_summary(player, represented_team),
+        "metrics": player_metrics(selection),
+        "scope": _scope(selection),
+        "coverage": selection_coverage(selection),
+    }
+
+
+def player_home_run_events(selection):
+    """Known event observations; membership uncertainty cannot define a list."""
+    if selection.membership_state != MembershipState.RESOLVED:
+        return []
+    pa_ids = {
+        pa_id for entry in selection.entries for pa_id in entry.plate_appearance_ids
+    }
+    if not pa_ids:
+        return []
+    events = list(
+        HomeRunEvent.objects.filter(
+            plate_appearance_id__in=pa_ids,
+            plate_appearance__outcome_category=PlateAppearance.Outcome.HOME_RUN,
+        ).select_related(
+            "plate_appearance__game",
+            "plate_appearance__batter",
+            "plate_appearance__pitcher",
+            "plate_appearance__batting_team",
+        )
+    )
+    ranks = {entry.game_id: index for index, entry in enumerate(selection.entries)}
+    events.sort(
+        key=lambda event: (
+            ranks[event.plate_appearance.game_id],
+            event.plate_appearance.game_pa_ordinal is None,
+            event.plate_appearance.game_pa_ordinal or 0,
+            event.id,
+        )
+    )
+    return events
+
+
+def public_home_run_events(events):
+    """Serialize a page of events with one bounded provenance query."""
+    events = list(events)
+    event_ids = [event.id for event in events]
+    provenance = {}
+    links = (
+        FactSourceLink.objects.filter(
+            entity_kind="HOME_RUN_EVENT",
+            canonical_entity_id__in=event_ids,
+            relation=FactSourceLink.Relation.SUPPORTS,
+        )
+        .select_related("source_record__provider")
+        .order_by("source_record__retrieved_at_utc", "id")
+    )
+    for link in links:
+        provenance.setdefault(
+            link.canonical_entity_id,
+            {
+                "source_label": link.source_record.provider.display_name,
+                "retrieved_at": link.source_record.retrieved_at_utc,
+            },
+        )
+    return [home_run_event_summary(event, provenance.get(event.id)) for event in events]
 
 
 def today_leaders(season, day, window):
