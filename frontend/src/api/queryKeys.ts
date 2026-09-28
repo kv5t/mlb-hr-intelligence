@@ -5,12 +5,16 @@ import {
   normalizeSeasonsParams,
   normalizeTeamsParams,
   normalizeTodayParams,
+  normalizeTeamDetailParams,
+  normalizeTeamHomeRunsParams,
   type GamesParams,
   type PlayersParams,
   type PlayerLeaderboardParams,
   type SeasonsParams,
   type TeamsParams,
   type TodayParams,
+  type TeamDetailParams,
+  type TeamHomeRunsParams,
 } from './params'
 
 export const queryKeys = {
@@ -22,4 +26,8 @@ export const queryKeys = {
   games: (params: GamesParams = {}) => ['v1', 'games', normalizeGamesParams(params)] as const,
   game: (id: string) => ['v1', 'game', id] as const,
   today: (params: TodayParams) => ['v1', 'today', normalizeTodayParams(params)] as const,
+  teamDetail: (id: string, params: TeamDetailParams) =>
+    ['v1', 'team', id, normalizeTeamDetailParams(params)] as const,
+  teamHomeRuns: (id: string, params: TeamHomeRunsParams) =>
+    ['v1', 'team', id, 'home-runs', normalizeTeamHomeRunsParams(params)] as const,
 }

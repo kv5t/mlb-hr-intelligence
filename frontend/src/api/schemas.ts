@@ -170,9 +170,9 @@ export const teamsResponseSchema = paginatedSchema(teamSummarySchema)
 export const playersResponseSchema = paginatedSchema(playerSummarySchema)
 export const gamesResponseSchema = paginatedSchema(gameSummarySchema)
 
-export const windowScopeSchema = z.object({
+export const baseWindowScopeSchema = z.object({
   season: z.number().int(),
-  subject: z.literal('PLAYER'),
+  subject: z.enum(['PLAYER', 'TEAM']),
   game_type: z.literal('REGULAR'),
   window: z.enum(['7G', '15G', '30G', '60G', 'SEASON']),
   requested_n: z.number().int().nullable(),
@@ -180,13 +180,24 @@ export const windowScopeSchema = z.object({
   cutoff_source: z.enum(['EXPLICIT', 'LATEST']),
 })
 
-export const leaderScopeSchema = windowScopeSchema.extend({
+export const windowScopeSchema = baseWindowScopeSchema.extend({
+  subject: z.literal('PLAYER'),
+})
+
+const resolvedScopeFields = {
   subject_id: uuid,
   team_filter_id: uuid.nullable(),
   home_away: z.enum(['ALL', 'HOME', 'AWAY']),
   selection_state: z.enum(['VALUE', 'UNKNOWN', 'INCOMPLETE', 'ORDER_UNVERIFIED']),
   actual_game_count: z.number().int().nullable(),
   known_eligible_game_count: z.number().int().nonnegative(),
+} as const
+
+export const leaderScopeSchema = windowScopeSchema.extend(resolvedScopeFields)
+export const teamWindowScopeSchema = baseWindowScopeSchema.extend({
+  subject: z.literal('TEAM'),
+  ...resolvedScopeFields,
+  team_filter_id: z.null(),
 })
 
 const requiredLeaderboardMetricsSchema = z.object({
@@ -209,6 +220,38 @@ export const leaderboardRowSchema = z.object({
 
 export const todayLeaderSchema = leaderboardRowSchema
 export const playerLeaderboardResponseSchema = paginatedSchema(leaderboardRowSchema)
+
+const requiredTeamMetricsSchema = z.object({
+  'team.hr': metricValueSchema,
+  'team.pa': metricValueSchema,
+  'team.hr_per_pa': metricValueSchema,
+  'team.pa_per_hr': metricValueSchema,
+  'team.hr_per_game': metricValueSchema,
+  'team.hr_games': metricValueSchema,
+  'team.hr_game_pct': metricValueSchema,
+  'team.multi_hr_games': metricValueSchema,
+  'team.avg_hr_gap_games': metricValueSchema,
+  'team.median_hr_gap_games': metricValueSchema,
+  'team.current_hr_drought_games': metricValueSchema,
+  'team.max_hr_drought_games': metricValueSchema,
+  'team.current_hr_streak_games': metricValueSchema,
+  'team.max_hr_streak_games': metricValueSchema,
+}).catchall(metricValueSchema)
+
+export const teamDetailSchema = z.object({
+  team: teamSummarySchema,
+  metrics: requiredTeamMetricsSchema,
+  scope: teamWindowScopeSchema,
+  coverage: z.array(coverageSummarySchema),
+  meta: metaSchema,
+})
+
+export const teamHomeRunsResponseSchema = paginatedSchema(homeRunEventSummarySchema).extend({
+  team: teamSummarySchema,
+  total_hr: metricValueSchema,
+  scope: teamWindowScopeSchema,
+  coverage: z.array(coverageSummarySchema),
+})
 
 export const todayResponseSchema = z.object({
   date: isoDate,

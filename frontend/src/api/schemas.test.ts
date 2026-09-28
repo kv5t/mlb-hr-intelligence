@@ -6,6 +6,8 @@ import {
   playerLeaderboardResponseSchema,
   seasonsResponseSchema,
   todayResponseSchema,
+  teamDetailSchema,
+  teamHomeRunsResponseSchema,
 } from './schemas'
 import { game, meta, player, valueMetric } from '@/test/fixtures'
 
@@ -103,5 +105,25 @@ describe('B11 response schemas', () => {
     )
     expect(() => playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, metrics: missingRequiredMetric }], meta })).toThrow()
     expect(() => playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, scope: { ...row.scope, selection_state: 'NEW' } }], meta })).toThrow()
+  })
+
+  it('validates team detail KPI completeness and team HR-log envelopes', () => {
+    const teamMetrics = Object.fromEntries([
+      'hr', 'pa', 'hr_per_pa', 'pa_per_hr', 'hr_per_game', 'hr_games',
+      'hr_game_pct', 'multi_hr_games', 'avg_hr_gap_games', 'median_hr_gap_games',
+      'current_hr_drought_games', 'max_hr_drought_games',
+      'current_hr_streak_games', 'max_hr_streak_games',
+    ].map((name) => [`team.${name}`, valueMetric]))
+    const scope = {
+      season: 2099, subject: 'TEAM', subject_id: game.home_team.id, game_type: 'REGULAR',
+      window: '7G', requested_n: 7, cutoff_date: '2099-04-03', cutoff_source: 'EXPLICIT',
+      team_filter_id: null, home_away: 'ALL', selection_state: 'VALUE',
+      actual_game_count: 1, known_eligible_game_count: 1,
+    }
+    const detail = { team: game.home_team, metrics: { ...teamMetrics, 'team.future_metric': valueMetric }, scope, coverage: [], meta }
+    expect(teamDetailSchema.parse(detail).metrics['team.future_metric'].value).toBe(0)
+    expect(() => teamDetailSchema.parse({ ...detail, metrics: { ...teamMetrics, 'team.hr': undefined } })).toThrow()
+    expect(teamHomeRunsResponseSchema.parse({ count: 0, next: null, previous: null, results: [], team: game.home_team, total_hr: valueMetric, scope, coverage: [], meta }).total_hr.value).toBe(0)
+    expect(() => teamDetailSchema.parse({ ...detail, scope: { ...scope, subject: 'PLAYER' } })).toThrow()
   })
 })

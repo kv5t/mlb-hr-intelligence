@@ -8,12 +8,16 @@ import {
   normalizeSeasonsParams,
   normalizeTeamsParams,
   normalizeTodayParams,
+  normalizeTeamDetailParams,
+  normalizeTeamHomeRunsParams,
   type GamesParams,
   type PlayersParams,
   type PlayerLeaderboardParams,
   type SeasonsParams,
   type TeamsParams,
   type TodayParams,
+  type TeamDetailParams,
+  type TeamHomeRunsParams,
 } from './params'
 import { queryKeys } from './queryKeys'
 import {
@@ -24,6 +28,8 @@ import {
   seasonsResponseSchema,
   teamsResponseSchema,
   todayResponseSchema,
+  teamDetailSchema,
+  teamHomeRunsResponseSchema,
 } from './schemas'
 
 const staleTime = 30_000
@@ -93,5 +99,25 @@ export function useToday(params: TodayParams) {
     queryKey: queryKeys.today(normalized),
     queryFn: ({ signal }) => apiGet({ path: 'today/', params: normalized, schema: todayResponseSchema, signal }),
     staleTime,
+  })
+}
+
+export function useTeamDetail(id: string, params: TeamDetailParams) {
+  const normalized = normalizeTeamDetailParams(params)
+  return useQuery({
+    queryKey: queryKeys.teamDetail(id, normalized),
+    queryFn: ({ signal }) => apiGet({ path: `teams/${id}/`, params: normalized, schema: teamDetailSchema, signal }),
+    staleTime,
+    enabled: id.length > 0,
+  })
+}
+
+export function useTeamHomeRuns(id: string, params: TeamHomeRunsParams) {
+  const normalized = normalizeTeamHomeRunsParams(params)
+  return useQuery({
+    queryKey: queryKeys.teamHomeRuns(id, normalized),
+    queryFn: ({ signal }) => apiGet({ path: `teams/${id}/home-runs/`, params: normalized, schema: teamHomeRunsResponseSchema, signal }),
+    staleTime,
+    enabled: id.length > 0,
   })
 }

@@ -35,7 +35,7 @@ function LeagueContent({ season, seasons, seasonsError, seasonsPending, retrySea
   const teams = useTeams({ season, page_size: 100 })
   const change = (key: UrlStateKey, value: string | null, resetPage = true) => setSearchParams(updateUrlState(searchParams, { [key]: value }, { resetPage }))
   const effectiveOrdering = params.ordering ?? '-hr'
-  const sort = (field: Parameters<React.ComponentProps<typeof PlayerLeaderboardTable>['onSort']>[0]) => {
+  const sort = (field: Parameters<NonNullable<React.ComponentProps<typeof PlayerLeaderboardTable>['onSort']>>[0]) => {
     const next = effectiveOrdering === `-${field}` ? field : `-${field}`
     change('ordering', next)
   }

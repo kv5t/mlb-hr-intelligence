@@ -19,11 +19,16 @@ const definitions = {
   home_away: z.enum(['ALL', 'HOME', 'AWAY']),
   search: z.string().trim().min(1),
   position: z.string().trim().min(1),
+  league: z.string().trim().min(1),
+  division: z.string().trim().min(1),
   bats: z.enum(['L', 'R', 'S', 'UNKNOWN']),
   ordering: z.string().min(1),
   page: z.string().regex(/^[1-9]\d*$/),
   discovery_page: z.string().regex(/^[1-9]\d*$/),
   comparison_page: z.string().regex(/^[1-9]\d*$/),
+  games_page: z.string().regex(/^[1-9]\d*$/),
+  hr_page: z.string().regex(/^[1-9]\d*$/),
+  tab: z.enum(['overview', 'players', 'games', 'hr-log']),
   page_size: z.string().regex(/^[1-9]\d*$/).refine((value) => Number(value) <= 100),
   date,
   date_from: date,
@@ -31,7 +36,7 @@ const definitions = {
   status: z.enum(GAME_STATUSES),
 } as const
 
-export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'generic'
+export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'teams' | 'teamDetail' | 'generic'
 export type UrlStateKey = keyof typeof definitions
 
 const routeDefinitions: Record<
@@ -75,6 +80,27 @@ const routeDefinitions: Record<
     ordering: z.enum(PLAYER_LEADERBOARD_ORDERINGS),
     discovery_page: definitions.discovery_page,
     comparison_page: definitions.comparison_page,
+    page_size: definitions.page_size,
+  },
+  teams: {
+    season: definitions.season,
+    league: definitions.league,
+    division: definitions.division,
+    search: definitions.search,
+    ordering: z.enum(['name', '-name', 'abbreviation', '-abbreviation']),
+    page: definitions.page,
+    page_size: definitions.page_size,
+  },
+  teamDetail: {
+    season: definitions.season,
+    window: definitions.window,
+    cutoff: definitions.cutoff,
+    home_away: definitions.home_away,
+    tab: definitions.tab,
+    discovery_page: definitions.discovery_page,
+    comparison_page: definitions.comparison_page,
+    games_page: definitions.games_page,
+    hr_page: definitions.hr_page,
     page_size: definitions.page_size,
   },
   generic: definitions,

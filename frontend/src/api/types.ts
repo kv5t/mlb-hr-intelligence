@@ -16,6 +16,9 @@ import type {
   teamSummarySchema,
   teamsResponseSchema,
   todayResponseSchema,
+  teamDetailSchema,
+  teamHomeRunsResponseSchema,
+  teamWindowScopeSchema,
 } from './schemas'
 
 export type Meta = z.infer<typeof metaSchema>
@@ -33,3 +36,6 @@ export type LeaderboardRow = z.infer<typeof leaderboardRowSchema>
 export type PlayerLeaderboardResponse = z.infer<typeof playerLeaderboardResponseSchema>
 export type GamesResponse = z.infer<typeof gamesResponseSchema>
 export type TodayResponse = z.infer<typeof todayResponseSchema>
+export type TeamWindowScope = z.infer<typeof teamWindowScopeSchema>
+export type TeamDetail = z.infer<typeof teamDetailSchema>
+export type TeamHomeRunsResponse = z.infer<typeof teamHomeRunsResponseSchema>

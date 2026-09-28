@@ -31,14 +31,14 @@ function SortHeader({ field, label, ordering, onSort }: { field: SortField; labe
   )
 }
 
-export function PlayerLeaderboardTable({ rows, ordering, onSort, compact = false }: { rows: LeaderboardRow[]; ordering?: Ordering; onSort: (field: SortField) => void; compact?: boolean }) {
+export function PlayerLeaderboardTable({ rows, ordering, onSort, compact = false }: { rows: LeaderboardRow[]; ordering?: Ordering; onSort?: (field: SortField) => void; compact?: boolean }) {
   const metric = (id: string, label: string, field: SortField) => column.display({
     id: field,
-    header: () => <SortHeader field={field} label={label} onSort={onSort} ordering={ordering} />,
+    header: () => onSort ? <SortHeader field={field} label={label} onSort={onSort} ordering={ordering} /> : label,
     cell: ({ row }) => <MetricCell id={id} label={label} row={row.original} />,
   })
   const columns = column.columns([
-    column.display({ id: 'name', header: () => <SortHeader field="name" label="Player" onSort={onSort} ordering={ordering} />, cell: ({ row }) => <Link className="font-medium underline underline-offset-4" to={`/players/${row.original.player.id}`}>{row.original.player.display_name ?? 'Unknown player'}</Link> }),
+    column.display({ id: 'name', header: () => onSort ? <SortHeader field="name" label="Player" onSort={onSort} ordering={ordering} /> : 'Player', cell: ({ row }) => <Link className="font-medium underline underline-offset-4" to={`/players/${row.original.player.id}`}>{row.original.player.display_name ?? 'Unknown player'}</Link> }),
     ...(rows.some((row) => row.player.represented_team) ? [column.display({ id: 'team', header: 'Represented team', cell: ({ row }) => row.original.player.represented_team?.abbreviation ?? row.original.player.represented_team?.display_name })] : []),
     metric('player.hr', 'HR', 'hr'),
     ...(compact ? [] : [metric('player.pa', 'PA', 'pa'), metric('player.hr_per_pa', 'HR / PA', 'hr_per_pa'), metric('player.pa_per_hr', 'PA / HR', 'pa_per_hr')]),

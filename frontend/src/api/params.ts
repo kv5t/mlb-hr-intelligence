@@ -90,6 +90,16 @@ export const playerLeaderboardParamsSchema = z.object({
   ordering: z.enum(PLAYER_LEADERBOARD_ORDERINGS).optional(),
   ...pageFields,
 })
+export const teamDetailParamsSchema = z.object({
+  season: year,
+  window: z.enum(WINDOWS).optional(),
+  home_away: z.enum(HOME_AWAY).optional(),
+  cutoff: date.optional(),
+})
+export const teamHomeRunsParamsSchema = teamDetailParamsSchema.extend({
+  ordering: z.enum(['official_date', '-official_date']).optional(),
+  ...pageFields,
+})
 
 export type SeasonsParams = z.input<typeof seasonsParamsSchema>
 export type TeamsParams = z.input<typeof teamsParamsSchema>
@@ -97,6 +107,8 @@ export type PlayersParams = z.input<typeof playersParamsSchema>
 export type GamesParams = z.input<typeof gamesParamsSchema>
 export type TodayParams = z.input<typeof todayParamsSchema>
 export type PlayerLeaderboardParams = z.input<typeof playerLeaderboardParamsSchema>
+export type TeamDetailParams = z.input<typeof teamDetailParamsSchema>
+export type TeamHomeRunsParams = z.input<typeof teamHomeRunsParamsSchema>
 
 type ParamsSchema = z.ZodObject<z.ZodRawShape>
 
@@ -114,6 +126,8 @@ export const normalizeGamesParams = (value: unknown = {}) => normalize(gamesPara
 export const normalizeTodayParams = (value: unknown) => normalize(todayParamsSchema, value)
 export const normalizePlayerLeaderboardParams = (value: unknown) =>
   normalize(playerLeaderboardParamsSchema, value)
+export const normalizeTeamDetailParams = (value: unknown) => normalize(teamDetailParamsSchema, value)
+export const normalizeTeamHomeRunsParams = (value: unknown) => normalize(teamHomeRunsParamsSchema, value)
 
 export function queryString(params: Record<string, unknown>): string {
   const query = new URLSearchParams()

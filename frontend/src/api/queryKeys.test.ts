@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeGamesParams, normalizePlayerLeaderboardParams } from './params'
+import { normalizeGamesParams, normalizePlayerLeaderboardParams, normalizeTeamDetailParams } from './params'
 import { queryKeys } from './queryKeys'
 import { shareDatasetRevision } from './revision'
 import { UUIDS, meta } from '@/test/fixtures'
@@ -35,5 +35,12 @@ describe('query keys and parameters', () => {
     expect(normalized).not.toHaveProperty('dataset_revision')
     expect(queryKeys.playerLeaderboard(normalized)).toEqual(queryKeys.playerLeaderboard({ ...normalized }))
     expect(queryKeys.playerLeaderboard({ season: 2099, page: 1 })).not.toEqual(queryKeys.playerLeaderboard({ season: 2099, page: 2 }))
+  })
+
+  it('separates team detail and HR-log cache keys by every accepted scope input', () => {
+    const detail = { season: 2099, window: '7G' as const, home_away: 'HOME' as const, cutoff: '2099-04-03' }
+    expect(queryKeys.teamDetail(UUIDS.teamA, detail)).not.toEqual(queryKeys.teamDetail(UUIDS.teamA, { ...detail, window: '15G' }))
+    expect(queryKeys.teamHomeRuns(UUIDS.teamA, { ...detail, page: 1 })).not.toEqual(queryKeys.teamHomeRuns(UUIDS.teamA, { ...detail, page: 2 }))
+    expect(normalizeTeamDetailParams({ ...detail, page: 2, dataset_revision: '7' })).toEqual(detail)
   })
 })

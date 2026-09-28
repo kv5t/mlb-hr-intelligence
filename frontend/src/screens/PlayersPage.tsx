@@ -43,7 +43,7 @@ function PlayersContent({ season, seasons, seasonsError, seasonsPending, retrySe
     }))
   }
   const effectiveOrdering = comparisonParams.ordering ?? '-hr'
-  const sort = (field: Parameters<React.ComponentProps<typeof PlayerLeaderboardTable>['onSort']>[0]) => change('ordering', effectiveOrdering === `-${field}` ? field : `-${field}`)
+  const sort = (field: Parameters<NonNullable<React.ComponentProps<typeof PlayerLeaderboardTable>['onSort']>>[0]) => change('ordering', effectiveOrdering === `-${field}` ? field : `-${field}`)
   const discoveryPage = Number(parsed.state.discovery_page ?? 1)
   const comparisonPage = Number(parsed.state.comparison_page ?? 1)
   const mismatch = identities.data && comparison.data && !shareDatasetRevision(identities.data, comparison.data)
