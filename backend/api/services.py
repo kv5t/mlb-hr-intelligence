@@ -8,8 +8,11 @@ from analytics.coverage import (
     assess_player_pa_integrity,
     evaluate_game_coverage,
 )
-from analytics.production import compute_player_production_metrics
-from analytics.recurrence import compute_player_recurrence
+from analytics.production import (
+    compute_player_production_metrics,
+    compute_team_production_metrics,
+)
+from analytics.recurrence import compute_player_recurrence, compute_team_recurrence
 from analytics.values import MetricState, MetricValue
 from analytics.windows import MembershipState, select_player_window
 from domain.models import (
@@ -263,8 +266,21 @@ def player_metrics(selection):
     return {name: metric_value(value) for name, value in metrics.items()}
 
 
+def team_metrics(selection):
+    """All scalar B09/B10 team metrics for an already selected scope."""
+    metrics = compute_team_production_metrics(selection)
+    metrics.update(compute_team_recurrence(selection).metrics)
+    return {name: metric_value(value) for name, value in metrics.items()}
+
+
+def team_hr_total(selection):
+    """Authoritative team HR total without computing unrelated recurrence KPIs."""
+    metric = compute_team_production_metrics(selection)["team.hr"]
+    return metric_value(metric)
+
+
 def selection_coverage(selection):
-    """Conservative current coverage projection across selected player games."""
+    """Conservative current coverage projection across selected games."""
     game_ids = {entry.game_id for entry in selection.entries}
     if not game_ids:
         return []
@@ -323,6 +339,30 @@ def player_analytics_row(player, selection, requested_team=None):
     }
 
 
+def team_analytics(team, selection):
+    return {
+        "team": team_summary(team),
+        "metrics": team_metrics(selection),
+        "scope": _scope(selection),
+        "coverage": selection_coverage(selection),
+    }
+
+
+def _order_home_run_events(events, selection, *, descending=False):
+    ranks = {entry.game_id: index for index, entry in enumerate(selection.entries)}
+    events.sort(
+        key=lambda event: (
+            -ranks[event.plate_appearance.game_id]
+            if descending
+            else ranks[event.plate_appearance.game_id],
+            event.plate_appearance.game_pa_ordinal is None,
+            event.plate_appearance.game_pa_ordinal or 0,
+            event.id,
+        )
+    )
+    return events
+
+
 def player_home_run_events(selection):
     """Known event observations; membership uncertainty cannot define a list."""
     if selection.membership_state != MembershipState.RESOLVED:
@@ -343,16 +383,32 @@ def player_home_run_events(selection):
             "plate_appearance__batting_team",
         )
     )
-    ranks = {entry.game_id: index for index, entry in enumerate(selection.entries)}
-    events.sort(
-        key=lambda event: (
-            ranks[event.plate_appearance.game_id],
-            event.plate_appearance.game_pa_ordinal is None,
-            event.plate_appearance.game_pa_ordinal or 0,
-            event.id,
+    return _order_home_run_events(events, selection)
+
+
+def team_home_run_events(selection):
+    """Verified team-batting events from a definitive team-game window."""
+    if selection.membership_state != MembershipState.RESOLVED:
+        return []
+    game_ids = [entry.game_id for entry in selection.entries]
+    events = list(
+        HomeRunEvent.objects.filter(
+            plate_appearance__game_id__in=game_ids,
+            plate_appearance__batting_team_id=selection.subject_id,
+            plate_appearance__outcome_category=PlateAppearance.Outcome.HOME_RUN,
+        ).select_related(
+            "plate_appearance__game",
+            "plate_appearance__batter",
+            "plate_appearance__pitcher",
+            "plate_appearance__batting_team",
         )
     )
-    return events
+    return _order_home_run_events(events, selection)
+
+
+def order_home_run_events(events, selection, *, descending=False):
+    """Apply canonical window/game/PA/event ordering to an event list."""
+    return _order_home_run_events(events, selection, descending=descending)
 
 
 def public_home_run_events(events):

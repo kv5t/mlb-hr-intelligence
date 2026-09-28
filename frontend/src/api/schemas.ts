@@ -189,9 +189,20 @@ export const leaderScopeSchema = windowScopeSchema.extend({
   known_eligible_game_count: z.number().int().nonnegative(),
 })
 
+const requiredLeaderboardMetricsSchema = z.object({
+  'player.hr': metricValueSchema,
+  'player.pa': metricValueSchema,
+  'player.hr_per_pa': metricValueSchema,
+  'player.pa_per_hr': metricValueSchema,
+  'player.hr_per_game': metricValueSchema,
+  'player.hr_game_pct': metricValueSchema,
+  'player.median_hr_gap_games': metricValueSchema,
+  'player.current_hr_drought_games': metricValueSchema,
+}).catchall(metricValueSchema)
+
 export const leaderboardRowSchema = z.object({
   player: playerSummarySchema,
-  metrics: z.record(z.string(), metricValueSchema),
+  metrics: requiredLeaderboardMetricsSchema,
   scope: leaderScopeSchema,
   coverage: z.array(coverageSummarySchema),
 })

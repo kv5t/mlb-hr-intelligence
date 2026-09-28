@@ -73,9 +73,19 @@ describe('B11 response schemas', () => {
   })
 
   it('parses B14 leaderboard rows and rejects malformed scope enums', () => {
+    const requiredMetrics = {
+      'player.hr': valueMetric,
+      'player.pa': valueMetric,
+      'player.hr_per_pa': valueMetric,
+      'player.pa_per_hr': valueMetric,
+      'player.hr_per_game': valueMetric,
+      'player.hr_game_pct': valueMetric,
+      'player.median_hr_gap_games': valueMetric,
+      'player.current_hr_drought_games': valueMetric,
+    }
     const row = {
       player,
-      metrics: { 'player.hr': valueMetric },
+      metrics: { ...requiredMetrics, 'player.future_metric': valueMetric },
       scope: {
         season: 2099, subject: 'PLAYER', subject_id: player.id, game_type: 'REGULAR',
         window: '30G', requested_n: 30, cutoff_date: '2099-04-03', cutoff_source: 'EXPLICIT',
@@ -86,7 +96,12 @@ describe('B11 response schemas', () => {
     }
     const parsed = playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, compatible_future_field: true }], meta })
     expect(parsed.results[0].scope.actual_game_count).toBe(17)
+    expect(parsed.results[0].metrics['player.future_metric'].value).toBe(0)
     expect(parsed.results[0]).not.toHaveProperty('compatible_future_field')
+    const missingRequiredMetric = Object.fromEntries(
+      Object.entries(row.metrics).filter(([key]) => key !== 'player.pa'),
+    )
+    expect(() => playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, metrics: missingRequiredMetric }], meta })).toThrow()
     expect(() => playerLeaderboardResponseSchema.parse({ count: 1, next: null, previous: null, results: [{ ...row, scope: { ...row.scope, selection_state: 'NEW' } }], meta })).toThrow()
   })
 })

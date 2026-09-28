@@ -16,14 +16,21 @@ const incompleteMetric = { ...valueMetric, state: 'INCOMPLETE', value: null, num
 const secondGame = { ...game, id: '77777777-7777-4777-8777-777777777777', scheduled_game_number: 2, status: 'SCHEDULED', finality: 'NOT_FINAL', home_score: null, away_score: null, hr_count: unknownMetric }
 const thirdGame = { ...game, id: '88888888-8888-4888-8888-888888888888', official_date: '2099-04-04', hr_count: incompleteMetric }
 const scope = { season: 2099, subject: 'PLAYER', game_type: 'REGULAR', window: 'SEASON', requested_n: null, cutoff_date: '2099-04-03', cutoff_source: 'EXPLICIT' }
+const displayedPlayerMetrics = {
+  'player.hr': { ...valueMetric, value: 2, numerator: 2 },
+  'player.pa': valueMetric,
+  'player.hr_per_pa': valueMetric,
+  'player.pa_per_hr': valueMetric,
+  'player.hr_per_game': valueMetric,
+  'player.hr_game_pct': { ...valueMetric, value: 50, unit: 'PERCENT', numerator: 1, denominator: 2 },
+  'player.median_hr_gap_games': valueMetric,
+  'player.current_hr_drought_games': valueMetric,
+}
 const today = {
   date: '2099-04-03', games: [game, secondGame, thirdGame],
   recent_leaders: [{
     player,
-    metrics: {
-      'player.hr': { ...valueMetric, value: 2, numerator: 2 },
-      'player.hr_game_pct': { ...valueMetric, value: 50, unit: 'PERCENT', numerator: 1, denominator: 2 },
-    },
+    metrics: displayedPlayerMetrics,
     scope: { ...scope, subject_id: UUIDS.player, team_filter_id: null, home_away: 'ALL', selection_state: 'VALUE', actual_game_count: 2, known_eligible_game_count: 2 },
     coverage: [],
   }],

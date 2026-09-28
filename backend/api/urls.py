@@ -8,6 +8,8 @@ from .views import (
     PlayerLeaderboardView,
     PlayersView,
     SeasonsView,
+    TeamDetailView,
+    TeamHomeRunsView,
     TeamsView,
     TodayView,
 )
@@ -15,6 +17,8 @@ from .views import (
 urlpatterns = [
     path("seasons/", SeasonsView.as_view()),
     path("teams/", TeamsView.as_view()),
+    path("teams/<str:id>/home-runs/", TeamHomeRunsView.as_view()),
+    path("teams/<str:id>/", TeamDetailView.as_view()),
     path("players/", PlayersView.as_view()),
     path("players/<str:id>/home-runs/", PlayerHomeRunsView.as_view()),
     path("players/<str:id>/", PlayerDetailView.as_view()),

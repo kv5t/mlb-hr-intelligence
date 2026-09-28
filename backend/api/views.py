@@ -16,6 +16,7 @@ from analytics.windows import (
     SelectionError,
     SelectionResult,
     select_player_window,
+    select_team_window,
 )
 from domain.models import (
     Game,
@@ -34,6 +35,7 @@ from .serializers import player_summary, season_summary, team_summary
 from .services import (
     _scope,
     game_detail,
+    order_home_run_events,
     player_analytics_row,
     player_home_run_events,
     player_metrics,
@@ -42,6 +44,9 @@ from .services import (
     represented_team_for_selection,
     schedule_date,
     selection_coverage,
+    team_analytics,
+    team_home_run_events,
+    team_hr_total,
     today_coverage,
     today_games,
     today_leader_population_availability,
@@ -272,6 +277,46 @@ def _select_player(*, player, season, window, team, home_away, cutoff):
         ) from error
 
 
+def _select_team(*, team, season, window, home_away, cutoff):
+    try:
+        return select_team_window(
+            season=season,
+            team=team,
+            window=window,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+    except SelectionError as error:
+        if error.code == "NO_FINAL_REGULAR_GAME" and cutoff == "LATEST":
+            return SelectionResult(
+                subject_kind="TEAM",
+                subject_id=team.id,
+                season_id=season.id,
+                season_year=season.year,
+                window=window,
+                requested_n=WINDOW_SIZES[window],
+                team_filter_id=None,
+                home_away=home_away,
+                cutoff_request=Cutoff.latest(),
+                resolved_cutoff=None,
+                membership_state=MembershipState.UNKNOWN,
+                order_state=OrderState.UNKNOWN,
+                entries=(),
+                known_core_entries=(),
+                known_eligible_game_count=0,
+                actual_game_count=None,
+                ambiguous_candidate_ids=(),
+                uncertain_candidate_ids=(),
+                unverified_order_groups=(),
+                full_scope_observations=(),
+            )
+        raise ApiProblem(
+            "INVALID_FILTER",
+            "Invalid analytical scope",
+            details={"scope": error.code},
+        ) from error
+
+
 class SeasonsView(ReadOnlyView):
     def get(self, request):
         _parameters(request, {"page", "page_size"})
@@ -326,6 +371,66 @@ class TeamsView(ReadOnlyView):
             [F("display_name").asc(nulls_last=True), "id"],
         )
         return Response(paginate(request, queryset.order_by(*ordering), team_summary))
+
+
+_TEAM_ANALYTICAL_PARAMETERS = {"season", "window", "home_away", "cutoff"}
+
+
+class TeamDetailView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(request, _TEAM_ANALYTICAL_PARAMETERS)
+        team = Team.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if team is None:
+            raise NotFound()
+        season, window, _, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_team(
+            team=team,
+            season=season,
+            window=window,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        return Response(team_analytics(team, selection))
+
+
+class TeamHomeRunsView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(
+            request,
+            _TEAM_ANALYTICAL_PARAMETERS | {"ordering", "page", "page_size"},
+        )
+        team = Team.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if team is None:
+            raise NotFound()
+        ordering = request.query_params.get("ordering", "official_date")
+        if ordering not in ("official_date", "-official_date"):
+            raise ApiProblem(
+                "INVALID_FILTER",
+                "Unsupported ordering",
+                details={"ordering": "unsupported"},
+            )
+        season, window, _, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_team(
+            team=team,
+            season=season,
+            window=window,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        events = team_home_run_events(selection)
+        if ordering.startswith("-"):
+            order_home_run_events(events, selection, descending=True)
+        page = paginate(request, events, lambda event: event)
+        page["results"] = public_home_run_events(page["results"])
+        page.update(
+            {
+                "team": team_summary(team),
+                "total_hr": team_hr_total(selection),
+                "scope": _scope(selection),
+                "coverage": selection_coverage(selection),
+            }
+        )
+        return Response(page)
 
 
 class PlayersView(ReadOnlyView):

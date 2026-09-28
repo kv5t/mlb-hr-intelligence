@@ -42,7 +42,15 @@ function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function installApi({ failTeams = false }: { failTeams?: boolean } = {}) {
+function installApi({
+  failTeams = false,
+  discoveryNext = null,
+  leaderboardNext = leaderboard.next,
+}: {
+  failTeams?: boolean
+  discoveryNext?: string | null
+  leaderboardNext?: string | null
+} = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.startsWith('/api/v1/seasons/')) return json(seasonPage)
@@ -50,8 +58,8 @@ function installApi({ failTeams = false }: { failTeams?: boolean } = {}) {
       if (failTeams) return json({ error: { code: 'UNAVAILABLE', message: 'Team discovery unavailable.', details: {} }, meta: { dataset_revision: null, data_as_of: null } }, 503)
       return json({ ...seasonPage, results: [team()] })
     }
-    if (url.startsWith('/api/v1/leaderboards/players/')) return json(leaderboard)
-    if (url.startsWith('/api/v1/players/')) return json(discovery)
+    if (url.startsWith('/api/v1/leaderboards/players/')) return json({ ...leaderboard, next: leaderboardNext })
+    if (url.startsWith('/api/v1/players/')) return json({ ...discovery, next: discoveryNext })
     throw new Error(`Unexpected request: ${url}`)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -110,6 +118,17 @@ describe('League vertical slice', () => {
 })
 
 describe('Players vertical slice', () => {
+  it.each([
+    '/players?season=0000',
+    '/players?season=2099&search=%20',
+    '/players?season=2099&position=%20',
+  ])('shows invalid URL state without starting analytical rendering for %s', async (url) => {
+    installApi()
+    renderApp(url)
+    expect(await screen.findByRole('heading', { name: 'Some URL filters are invalid' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Analytical comparison' })).not.toBeInTheDocument()
+  })
+
   it('keeps discovery and comparison separate with no per-row detail requests', async () => {
     const fetchMock = installApi()
     renderApp(`/players?season=2099&window=30G&team=${UUIDS.teamA}&search=Fixture&position=1B&bats=R&ordering=-hr`)
@@ -126,5 +145,28 @@ describe('Players vertical slice', () => {
     expect(urls.some((url) => /\/api\/v1\/players\/[0-9a-f-]+\//.test(url))).toBe(false)
     expect(screen.getAllByRole('link', { name: 'Fixture Slugger' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('columnheader', { name: /Games with HR/ })).toBeInTheDocument()
+  })
+
+  it('advances comparison without requesting the next discovery page', async () => {
+    const comparisonFetch = installApi()
+    renderApp('/players?season=2099')
+    const navigation = await screen.findByRole('navigation', { name: 'Player comparison pagination' })
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(comparisonFetch.mock.calls.some(([url]) => String(url).startsWith('/api/v1/leaderboards/players/') && String(url).includes('page=2'))).toBe(true))
+    const comparisonUrls = comparisonFetch.mock.calls.map(([url]) => String(url))
+    expect(comparisonUrls.filter((url) => url.startsWith('/api/v1/players/')).every((url) => !url.includes('page=2'))).toBe(true)
+  })
+
+  it('advances discovery without requesting the next comparison page', async () => {
+    const discoveryFetch = installApi({
+      discoveryNext: '/api/v1/players/?page=2',
+      leaderboardNext: null,
+    })
+    renderApp('/players?season=2099')
+    const navigation = await screen.findByRole('navigation', { name: 'Player discovery pagination' })
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Next' }))
+    await waitFor(() => expect(discoveryFetch.mock.calls.some(([url]) => String(url).startsWith('/api/v1/players/') && String(url).includes('page=2'))).toBe(true))
+    const discoveryUrls = discoveryFetch.mock.calls.map(([url]) => String(url))
+    expect(discoveryUrls.filter((url) => url.startsWith('/api/v1/leaderboards/players/')).every((url) => !url.includes('page=2'))).toBe(true)
   })
 })

@@ -29,4 +29,20 @@ describe('URL state', () => {
     expect(parseUrlState(new URLSearchParams('window=7G'), 'games').issues).toHaveLength(1)
     expect(parseUrlState(new URLSearchParams('ordering=garbage'), 'games').issues).toHaveLength(1)
   })
+
+  it('rejects URL values that API parameter schemas reject', () => {
+    for (const query of ['season=0000', 'search=%20', 'position=%20']) {
+      const parsed = parseUrlState(new URLSearchParams(query), 'players')
+      expect(parsed.state).toEqual({})
+      expect(parsed.issues).toHaveLength(1)
+    }
+    expect(parseUrlState(new URLSearchParams('season=2099&search=Fixture&position=1B'), 'players').issues).toEqual([])
+  })
+
+  it('rejects duplicates and restores independent player section pages', () => {
+    expect(parseUrlState(new URLSearchParams('season=2099&season=2098'), 'players').issues).toHaveLength(1)
+    const source = new URLSearchParams('season=2099&discovery_page=2&comparison_page=3')
+    const restored = parseUrlState(new URLSearchParams(parseUrlState(source, 'players').validParams), 'players')
+    expect(restored.state).toMatchObject({ discovery_page: '2', comparison_page: '3' })
+  })
 })
