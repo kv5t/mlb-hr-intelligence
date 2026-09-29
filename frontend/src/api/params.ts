@@ -100,6 +100,7 @@ export const teamHomeRunsParamsSchema = teamDetailParamsSchema.extend({
   ordering: z.enum(['official_date', '-official_date']).optional(),
   ...pageFields,
 })
+export const teamRecurrenceParamsSchema = teamDetailParamsSchema
 
 export type SeasonsParams = z.input<typeof seasonsParamsSchema>
 export type TeamsParams = z.input<typeof teamsParamsSchema>
@@ -109,6 +110,7 @@ export type TodayParams = z.input<typeof todayParamsSchema>
 export type PlayerLeaderboardParams = z.input<typeof playerLeaderboardParamsSchema>
 export type TeamDetailParams = z.input<typeof teamDetailParamsSchema>
 export type TeamHomeRunsParams = z.input<typeof teamHomeRunsParamsSchema>
+export type TeamRecurrenceParams = z.input<typeof teamRecurrenceParamsSchema>
 
 type ParamsSchema = z.ZodObject<z.ZodRawShape>
 
@@ -128,6 +130,7 @@ export const normalizePlayerLeaderboardParams = (value: unknown) =>
   normalize(playerLeaderboardParamsSchema, value)
 export const normalizeTeamDetailParams = (value: unknown) => normalize(teamDetailParamsSchema, value)
 export const normalizeTeamHomeRunsParams = (value: unknown) => normalize(teamHomeRunsParamsSchema, value)
+export const normalizeTeamRecurrenceParams = (value: unknown) => normalize(teamRecurrenceParamsSchema, value)
 
 export function queryString(params: Record<string, unknown>): string {
   const query = new URLSearchParams()

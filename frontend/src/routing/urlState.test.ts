@@ -58,4 +58,13 @@ describe('URL state', () => {
     expect(parseUrlState(new URLSearchParams('season=2099&hr_ordering=newest'), 'teamDetail').issues).toHaveLength(1)
     expect(parseUrlState(new URLSearchParams('season=2099&tab=recurrence'), 'teamDetail').issues).toHaveLength(1)
   })
+
+  it('validates and restores the Team recurrence scope and row order', () => {
+    const source = new URLSearchParams('season=2099&window=30G&home_away=HOME&cutoff=2099-04-30&row_order=window_hr_desc')
+    const parsed = parseUrlState(source, 'teamRecurrence')
+    expect(parsed.issues).toEqual([])
+    expect(parseUrlState(new URLSearchParams(parsed.validParams), 'teamRecurrence').state).toEqual(parsed.state)
+    expect(parseUrlState(new URLSearchParams('season=2099&window=30G&row_order=hr'), 'teamRecurrence').issues).toHaveLength(1)
+    expect(parseUrlState(new URLSearchParams('season=2099&window=30G&page=2'), 'teamRecurrence').issues).toHaveLength(1)
+  })
 })

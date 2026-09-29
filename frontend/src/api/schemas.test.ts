@@ -8,8 +8,11 @@ import {
   todayResponseSchema,
   teamDetailSchema,
   teamHomeRunsResponseSchema,
+  teamRecurrenceResponseSchema,
+  matrixCellSchema,
 } from './schemas'
 import { game, meta, player, valueMetric } from '@/test/fixtures'
+import { createTeamRecurrenceBenchmark } from '@/benchmarks/teamRecurrenceBenchmark'
 
 describe('B11 response schemas', () => {
   it('parses seasons and ignores compatible additive fields', () => {
@@ -125,5 +128,40 @@ describe('B11 response schemas', () => {
     expect(() => teamDetailSchema.parse({ ...detail, metrics: { ...teamMetrics, 'team.hr': undefined } })).toThrow()
     expect(teamHomeRunsResponseSchema.parse({ count: 0, next: null, previous: null, results: [], team: game.home_team, total_hr: valueMetric, scope, coverage: [], meta }).total_hr.value).toBe(0)
     expect(() => teamDetailSchema.parse({ ...detail, scope: { ...scope, subject: 'PLAYER' } })).toThrow()
+  })
+
+  it('validates the aligned Team recurrence response while allowing additive fields', () => {
+    const response = createTeamRecurrenceBenchmark(2, 3)
+    const parsed = teamRecurrenceResponseSchema.parse({ ...response, future_field: true })
+    expect(parsed.rows).toHaveLength(2)
+    expect(parsed.columns).toHaveLength(3)
+    expect(() => teamRecurrenceResponseSchema.parse({
+      ...response,
+      rows: [{ ...response.rows[0], cells: response.rows[0].cells.slice(1) }],
+    })).toThrow()
+    expect(() => teamRecurrenceResponseSchema.parse({
+      ...response,
+      columns: [response.columns[0], response.columns[0]],
+      rows: response.rows.map((row) => ({ ...row, cells: row.cells.slice(0, 2) })),
+    })).toThrow()
+    expect(() => teamRecurrenceResponseSchema.parse({
+      ...response,
+      columns: [{ ...response.columns[0], game_id: 'bad' }],
+      rows: response.rows.map((row) => ({ ...row, cells: row.cells.slice(0, 1) })),
+    })).toThrow()
+  })
+
+  it('enforces every discriminated MatrixCell invariant', () => {
+    const eventId = '77777777-7777-4777-8777-777777777777'
+    expect(matrixCellSchema.parse({ state: 'HR_COUNT', hr_count: 1, home_run_event_ids: [eventId], reason: null }).hr_count).toBe(1)
+    expect(() => matrixCellSchema.parse({ state: 'HR_COUNT', hr_count: 0, home_run_event_ids: [], reason: null })).toThrow()
+    expect(() => matrixCellSchema.parse({ state: 'HR_COUNT', hr_count: 2, home_run_event_ids: [eventId], reason: null })).toThrow()
+    expect(matrixCellSchema.parse({ state: 'KNOWN_ZERO', hr_count: 0, home_run_event_ids: [], reason: null }).hr_count).toBe(0)
+    expect(() => matrixCellSchema.parse({ state: 'KNOWN_ZERO', hr_count: null, home_run_event_ids: [], reason: null })).toThrow()
+    for (const state of ['DNP', 'ZERO_PA_APPEARANCE', 'NOT_WITH_TEAM', 'UNKNOWN', 'INCOMPLETE'] as const) {
+      expect(matrixCellSchema.parse({ state, hr_count: null, home_run_event_ids: [], reason: null }).state).toBe(state)
+      expect(() => matrixCellSchema.parse({ state, hr_count: 0, home_run_event_ids: [], reason: null })).toThrow()
+      expect(() => matrixCellSchema.parse({ state, hr_count: null, home_run_event_ids: [eventId], reason: null })).toThrow()
+    }
   })
 })

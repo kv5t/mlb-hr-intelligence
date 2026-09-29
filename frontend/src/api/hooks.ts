@@ -10,6 +10,7 @@ import {
   normalizeTodayParams,
   normalizeTeamDetailParams,
   normalizeTeamHomeRunsParams,
+  normalizeTeamRecurrenceParams,
   type GamesParams,
   type PlayersParams,
   type PlayerLeaderboardParams,
@@ -18,6 +19,7 @@ import {
   type TodayParams,
   type TeamDetailParams,
   type TeamHomeRunsParams,
+  type TeamRecurrenceParams,
 } from './params'
 import { queryKeys } from './queryKeys'
 import {
@@ -30,6 +32,7 @@ import {
   todayResponseSchema,
   teamDetailSchema,
   teamHomeRunsResponseSchema,
+  teamRecurrenceResponseSchema,
 } from './schemas'
 
 const staleTime = 30_000
@@ -117,6 +120,16 @@ export function useTeamHomeRuns(id: string, params: TeamHomeRunsParams) {
   return useQuery({
     queryKey: queryKeys.teamHomeRuns(id, normalized),
     queryFn: ({ signal }) => apiGet({ path: `teams/${id}/home-runs/`, params: normalized, schema: teamHomeRunsResponseSchema, signal }),
+    staleTime,
+    enabled: id.length > 0,
+  })
+}
+
+export function useTeamRecurrence(id: string, params: TeamRecurrenceParams) {
+  const normalized = normalizeTeamRecurrenceParams(params)
+  return useQuery({
+    queryKey: queryKeys.teamRecurrence(id, normalized),
+    queryFn: ({ signal }) => apiGet({ path: `teams/${id}/recurrence/`, params: normalized, schema: teamRecurrenceResponseSchema, signal }),
     staleTime,
     enabled: id.length > 0,
   })

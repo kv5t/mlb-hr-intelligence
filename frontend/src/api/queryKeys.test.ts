@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { normalizeGamesParams, normalizePlayerLeaderboardParams, normalizeTeamDetailParams } from './params'
+import { normalizeGamesParams, normalizePlayerLeaderboardParams, normalizeTeamDetailParams, normalizeTeamRecurrenceParams } from './params'
 import { queryKeys } from './queryKeys'
 import { shareDatasetRevision } from './revision'
 import { UUIDS, meta } from '@/test/fixtures'
@@ -42,5 +42,12 @@ describe('query keys and parameters', () => {
     expect(queryKeys.teamDetail(UUIDS.teamA, detail)).not.toEqual(queryKeys.teamDetail(UUIDS.teamA, { ...detail, window: '15G' }))
     expect(queryKeys.teamHomeRuns(UUIDS.teamA, { ...detail, page: 1 })).not.toEqual(queryKeys.teamHomeRuns(UUIDS.teamA, { ...detail, page: 2 }))
     expect(normalizeTeamDetailParams({ ...detail, page: 2, dataset_revision: '7' })).toEqual(detail)
+  })
+
+  it('keys Team recurrence by API scope and strips presentation-only state', () => {
+    const scope = { season: 2099, window: '30G' as const, home_away: 'AWAY' as const, cutoff: '2099-04-30' }
+    expect(queryKeys.teamRecurrence(UUIDS.teamA, scope)).not.toEqual(queryKeys.teamRecurrence(UUIDS.teamA, { ...scope, window: '60G' }))
+    expect(normalizeTeamRecurrenceParams({ ...scope, row_order: 'name', dataset_revision: '7' })).toEqual(scope)
+    expect(JSON.stringify(queryKeys.teamRecurrence(UUIDS.teamA, scope))).not.toContain('row_order')
   })
 })

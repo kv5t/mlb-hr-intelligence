@@ -71,8 +71,10 @@ describe('Team Detail vertical slice', () => {
     expect(urls.filter((url) => url.startsWith(`/api/v1/teams/${UUIDS.teamA}/`))).toHaveLength(1)
     expect(urls.some((url) => url.startsWith('/api/v1/players/'))).toBe(false)
     expect(urls.some((url) => url.startsWith('/api/v1/games/'))).toBe(false)
-    expect(screen.getByText('Recurrence matrix — UI coming in B19')).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.queryByRole('link', { name: 'Open team recurrence' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open team recurrence matrix' })).toHaveAttribute(
+      'href',
+      `/teams/${UUIDS.teamA}/recurrence?cutoff=2099-04-03&home_away=ALL&season=2099&window=7G`,
+    )
   })
 
   it('loads Players independently, labels association honestly, and keeps detail on panel failure', async () => {

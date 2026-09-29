@@ -7,6 +7,7 @@ import {
   normalizeTodayParams,
   normalizeTeamDetailParams,
   normalizeTeamHomeRunsParams,
+  normalizeTeamRecurrenceParams,
   type GamesParams,
   type PlayersParams,
   type PlayerLeaderboardParams,
@@ -15,6 +16,7 @@ import {
   type TodayParams,
   type TeamDetailParams,
   type TeamHomeRunsParams,
+  type TeamRecurrenceParams,
 } from './params'
 
 export const queryKeys = {
@@ -30,4 +32,6 @@ export const queryKeys = {
     ['v1', 'team', id, normalizeTeamDetailParams(params)] as const,
   teamHomeRuns: (id: string, params: TeamHomeRunsParams) =>
     ['v1', 'team', id, 'home-runs', normalizeTeamHomeRunsParams(params)] as const,
+  teamRecurrence: (id: string, params: TeamRecurrenceParams) =>
+    ['v1', 'team', id, 'recurrence', normalizeTeamRecurrenceParams(params)] as const,
 }

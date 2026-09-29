@@ -221,7 +221,7 @@ export const leaderboardRowSchema = z.object({
 export const todayLeaderSchema = leaderboardRowSchema
 export const playerLeaderboardResponseSchema = paginatedSchema(leaderboardRowSchema)
 
-const requiredTeamMetricsSchema = z.object({
+export const requiredTeamMetricsSchema = z.object({
   'team.hr': metricValueSchema,
   'team.pa': metricValueSchema,
   'team.hr_per_pa': metricValueSchema,
@@ -251,6 +251,92 @@ export const teamHomeRunsResponseSchema = paginatedSchema(homeRunEventSummarySch
   total_hr: metricValueSchema,
   scope: teamWindowScopeSchema,
   coverage: z.array(coverageSummarySchema),
+})
+
+const matrixReason = z.string().nullable()
+const noMatrixEvents = z.array(uuid).length(0)
+
+const hrCountCellSchema = z.object({
+  state: z.literal('HR_COUNT'),
+  hr_count: z.number().int().min(1),
+  home_run_event_ids: z.array(uuid).min(1),
+  reason: matrixReason,
+})
+
+const knownZeroCellSchema = z.object({
+  state: z.literal('KNOWN_ZERO'),
+  hr_count: z.literal(0),
+  home_run_event_ids: noMatrixEvents,
+  reason: matrixReason,
+})
+
+const nonnumericMatrixCell = <State extends 'DNP' | 'ZERO_PA_APPEARANCE' | 'NOT_WITH_TEAM' | 'UNKNOWN' | 'INCOMPLETE'>(state: State) => z.object({
+  state: z.literal(state),
+  hr_count: z.null(),
+  home_run_event_ids: noMatrixEvents,
+  reason: matrixReason,
+})
+
+export const matrixCellSchema = z.discriminatedUnion('state', [
+  hrCountCellSchema,
+  knownZeroCellSchema,
+  nonnumericMatrixCell('DNP'),
+  nonnumericMatrixCell('ZERO_PA_APPEARANCE'),
+  nonnumericMatrixCell('NOT_WITH_TEAM'),
+  nonnumericMatrixCell('UNKNOWN'),
+  nonnumericMatrixCell('INCOMPLETE'),
+]).superRefine((cell, context) => {
+  if (cell.state === 'HR_COUNT' && cell.home_run_event_ids.length !== cell.hr_count) {
+    context.addIssue({
+      code: 'custom',
+      path: ['home_run_event_ids'],
+      message: 'HR event IDs must match the HR count',
+    })
+  }
+})
+
+export const matrixColumnSchema = z.object({
+  game_id: uuid,
+  official_date: isoDate,
+  scheduled_game_number: z.number().int().positive().nullable(),
+  opponent: teamSummarySchema,
+  home_away: z.enum(['HOME', 'AWAY']),
+  game_status: z.enum([
+    'SCHEDULED', 'POSTPONED', 'RESCHEDULED', 'IN_PROGRESS', 'SUSPENDED',
+    'COMPLETED', 'CANCELLED', 'OTHER', 'UNKNOWN',
+  ]),
+  coverage: z.array(coverageSummarySchema),
+})
+
+export const matrixPlayerRowSchema = z.object({
+  player: playerSummarySchema,
+  player_season_hr: metricValueSchema,
+  window_hr: metricValueSchema,
+  cells: z.array(matrixCellSchema),
+})
+
+export const teamRecurrenceResponseSchema = z.object({
+  team: teamSummarySchema,
+  scope: teamWindowScopeSchema,
+  metrics: requiredTeamMetricsSchema,
+  columns: z.array(matrixColumnSchema),
+  rows: z.array(matrixPlayerRowSchema),
+  coverage: z.array(coverageSummarySchema),
+  meta: metaSchema,
+}).superRefine((response, context) => {
+  const gameIds = response.columns.map((column) => column.game_id)
+  if (new Set(gameIds).size !== gameIds.length) {
+    context.addIssue({ code: 'custom', path: ['columns'], message: 'Game IDs must be unique' })
+  }
+  response.rows.forEach((row, index) => {
+    if (row.cells.length !== response.columns.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['rows', index, 'cells'],
+        message: 'Matrix cells must align with columns',
+      })
+    }
+  })
 })
 
 export const todayResponseSchema = z.object({

@@ -19,6 +19,10 @@ import type {
   teamDetailSchema,
   teamHomeRunsResponseSchema,
   teamWindowScopeSchema,
+  teamRecurrenceResponseSchema,
+  matrixCellSchema,
+  matrixColumnSchema,
+  matrixPlayerRowSchema,
 } from './schemas'
 
 export type Meta = z.infer<typeof metaSchema>
@@ -39,3 +43,7 @@ export type TodayResponse = z.infer<typeof todayResponseSchema>
 export type TeamWindowScope = z.infer<typeof teamWindowScopeSchema>
 export type TeamDetail = z.infer<typeof teamDetailSchema>
 export type TeamHomeRunsResponse = z.infer<typeof teamHomeRunsResponseSchema>
+export type TeamRecurrenceResponse = z.infer<typeof teamRecurrenceResponseSchema>
+export type MatrixCell = z.infer<typeof matrixCellSchema>
+export type MatrixColumn = z.infer<typeof matrixColumnSchema>
+export type MatrixPlayerRow = z.infer<typeof matrixPlayerRowSchema>

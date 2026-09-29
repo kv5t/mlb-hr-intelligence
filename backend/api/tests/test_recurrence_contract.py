@@ -190,6 +190,37 @@ class RecurrenceApiTests(TestCase):
         self.assertEqual(row["player_season_hr"]["value"], 2)
         self.assertNotIn("represented_team", body["team"])
 
+    def test_player_representing_both_teams_has_one_team_scoped_matrix_row(self):
+        game_id = str(self.fixture.scenarios["both_teams"][0])
+
+        def row_and_cell(team):
+            body = self.team(
+                team=team,
+                query="season=2099&window=SEASON&cutoff=2099-04-19",
+            ).json()
+            player_rows = [
+                row
+                for row in body["rows"]
+                if row["player"]["id"] == str(self.slugger.id)
+            ]
+            self.assertEqual(len(player_rows), 1)
+            column_index = next(
+                index
+                for index, column in enumerate(body["columns"])
+                if column["game_id"] == game_id
+            )
+            return player_rows[0], player_rows[0]["cells"][column_index]
+
+        team_a_row, team_a_cell = row_and_cell(self.a)
+        team_b_row, team_b_cell = row_and_cell(self.b)
+        self.assertEqual(team_a_cell["state"], "HR_COUNT")
+        self.assertEqual(team_a_cell["hr_count"], 1)
+        self.assertEqual(len(team_a_cell["home_run_event_ids"]), 1)
+        self.assertEqual(team_b_cell["state"], "KNOWN_ZERO")
+        self.assertEqual(team_b_cell["hr_count"], 0)
+        self.assertEqual(team_b_cell["home_run_event_ids"], [])
+        self.assertEqual(team_a_row["player_season_hr"], team_b_row["player_season_hr"])
+
     def test_team_filters_windows_and_unavailable_resource_semantics(self):
         for window in ("7G", "15G", "30G", "60G", "SEASON"):
             self.assertEqual(
@@ -380,6 +411,25 @@ class RecurrenceApiTests(TestCase):
         self.assertIn(body["scope"]["selection_state"], {"UNKNOWN", "INCOMPLETE"})
         self.assertEqual(body["observations"], [])
         self.assertEqual(body["gaps"], [])
+
+    def test_public_gap_contract_omits_materially_unordered_same_day_endpoints(self):
+        unordered_ids = {
+            str(game_id) for game_id in self.fixture.scenarios["same_day_unordered"]
+        }
+        body = self.player(query="season=2099&window=7G&cutoff=2099-04-25").json()
+        self.assertEqual(body["scope"]["selection_state"], "VALUE")
+        self.assertEqual(
+            body["metrics"]["player.avg_hr_gap_games"]["state"],
+            "ORDER_UNVERIFIED",
+        )
+        self.assertEqual(
+            body["metrics"]["player.median_hr_gap_games"]["state"],
+            "ORDER_UNVERIFIED",
+        )
+        for gap in body["gaps"]:
+            self.assertTrue(
+                {gap["from_game_id"], gap["to_game_id"]}.isdisjoint(unordered_ids)
+            )
 
     def test_player_filters_and_current_metric_are_not_clamped_to_window(self):
         body = self.player(

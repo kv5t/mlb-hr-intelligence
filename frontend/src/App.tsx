@@ -9,6 +9,7 @@ import { PlayersPage } from '@/screens/PlayersPage'
 import { TodayPage } from '@/screens/TodayPage'
 import { TeamsPage } from '@/screens/TeamsPage'
 import { TeamDetailPage } from '@/screens/TeamDetailPage'
+import { TeamRecurrencePage } from '@/screens/TeamRecurrencePage'
 
 export default function App() {
   return (
@@ -19,7 +20,7 @@ export default function App() {
         <Route path="league" element={<LeaguePage />} />
         <Route path="teams" element={<TeamsPage />} />
         <Route path="teams/:teamId" element={<TeamDetailPage />} />
-        <Route path="teams/:teamId/recurrence" element={<RoutePlaceholder title="Team recurrence" />} />
+        <Route path="teams/:teamId/recurrence" element={<TeamRecurrencePage />} />
         <Route path="players" element={<PlayersPage />} />
         <Route path="players/:playerId" element={<RoutePlaceholder title="Player detail" />} />
         <Route path="players/:playerId/recurrence" element={<RoutePlaceholder title="Player recurrence" />} />

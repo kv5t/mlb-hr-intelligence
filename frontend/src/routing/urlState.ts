@@ -29,6 +29,7 @@ const definitions = {
   games_page: z.string().regex(/^[1-9]\d*$/),
   hr_page: z.string().regex(/^[1-9]\d*$/),
   hr_ordering: z.enum(['official_date', '-official_date']),
+  row_order: z.enum(['season_hr_desc', 'window_hr_desc', 'name']),
   tab: z.enum(['overview', 'players', 'games', 'hr-log']),
   page_size: z.string().regex(/^[1-9]\d*$/).refine((value) => Number(value) <= 100),
   date,
@@ -37,7 +38,7 @@ const definitions = {
   status: z.enum(GAME_STATUSES),
 } as const
 
-export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'teams' | 'teamDetail' | 'generic'
+export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'teams' | 'teamDetail' | 'teamRecurrence' | 'generic'
 export type UrlStateKey = keyof typeof definitions
 
 const routeDefinitions: Record<
@@ -104,6 +105,13 @@ const routeDefinitions: Record<
     hr_page: definitions.hr_page,
     hr_ordering: definitions.hr_ordering,
     page_size: definitions.page_size,
+  },
+  teamRecurrence: {
+    season: definitions.season,
+    window: definitions.window,
+    cutoff: definitions.cutoff,
+    home_away: definitions.home_away,
+    row_order: definitions.row_order,
   },
   generic: definitions,
 }
