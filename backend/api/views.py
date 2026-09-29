@@ -39,6 +39,7 @@ from .services import (
     player_analytics_row,
     player_home_run_events,
     player_metrics,
+    player_recurrence,
     public_game,
     public_home_run_events,
     represented_team_for_selection,
@@ -47,6 +48,7 @@ from .services import (
     team_analytics,
     team_home_run_events,
     team_hr_total,
+    team_recurrence,
     today_coverage,
     today_games,
     today_leader_population_availability,
@@ -433,6 +435,23 @@ class TeamHomeRunsView(ReadOnlyView):
         return Response(page)
 
 
+class TeamRecurrenceView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(request, _TEAM_ANALYTICAL_PARAMETERS)
+        team = Team.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if team is None:
+            raise NotFound()
+        season, window, _, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_team(
+            team=team,
+            season=season,
+            window=window,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        return Response(team_recurrence(team, selection))
+
+
 class PlayersView(ReadOnlyView):
     def get(self, request):
         _parameters(
@@ -644,6 +663,24 @@ class PlayerHomeRunsView(ReadOnlyView):
             }
         )
         return Response(page)
+
+
+class PlayerRecurrenceView(ReadOnlyView):
+    def get(self, request, id):
+        _parameters(request, _PLAYER_ANALYTICAL_PARAMETERS)
+        player = Player.objects.filter(pk=_uuid(id, "id", path=True)).first()
+        if player is None:
+            raise NotFound()
+        season, window, team, home_away, cutoff = _analytical_inputs(request)
+        selection = _select_player(
+            player=player,
+            season=season,
+            window=window,
+            team=team,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        return Response(player_recurrence(player, selection, team))
 
 
 def _games_order(raw):

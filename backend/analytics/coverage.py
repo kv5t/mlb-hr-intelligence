@@ -1,5 +1,6 @@
 """Current canonical evidence gates and matrix cell states, without KPI formulas."""
 
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
 from uuid import UUID
@@ -162,6 +163,27 @@ def evaluate_game_coverage(game: Game, domains) -> CoverageGate:
     )
 
 
+def evaluate_games_coverage(games, domains) -> dict[UUID, CoverageGate]:
+    """Evaluate the same domains for many games with one coverage query."""
+    games = {game.id: game for game in games}
+    required = _validate_domains(domains)
+    rows = {
+        (row.game_id, row.domain): row
+        for row in GameDataCoverage.objects.filter(
+            game_id__in=games, domain__in=required
+        )
+    }
+    return {
+        game_id: _gate(
+            tuple(
+                _evidence(game, domain, rows.get((game_id, domain)))
+                for domain in required
+            )
+        )
+        for game_id, game in games.items()
+    }
+
+
 def evaluate_selection_coverage(
     selection: SelectionResult, domains, *, order_sensitive: bool = False
 ) -> CoverageGate:
@@ -286,7 +308,7 @@ def assess_game_hr_zero(game: Game) -> ZeroEvidence:
     return assess_hr_zero(game)
 
 
-def _affirmatively_not_with_team(game: Game, player: Player, team: Team) -> bool:
+def _affirmatively_not_with_team_rows(game, team, affiliations) -> bool:
     """Require a precise departure and a dated different-team affiliation.
 
     One appearance elsewhere, absent rows or current metadata never suffices.
@@ -294,11 +316,6 @@ def _affirmatively_not_with_team(game: Game, player: Player, team: Team) -> bool
     """
     if game.official_date is None:
         return False
-    affiliations = list(
-        PlayerTeamAffiliation.objects.filter(player=player).filter(
-            Q(season=game.season) | Q(season__isnull=True)
-        )
-    )
     day = game.official_date
     if any(
         row.team_id == team.id
@@ -336,93 +353,159 @@ def _affirmatively_not_with_team(game: Game, player: Player, team: Team) -> bool
     return departed and with_other_team
 
 
+def _affirmatively_not_with_team(game: Game, player: Player, team: Team) -> bool:
+    affiliations = list(
+        PlayerTeamAffiliation.objects.filter(player=player).filter(
+            Q(season=game.season) | Q(season__isnull=True)
+        )
+    )
+    return _affirmatively_not_with_team_rows(game, team, affiliations)
+
+
+class MatrixEvidenceIndex:
+    """Batch canonical evidence for a matrix without issuing queries per cell."""
+
+    def __init__(self, games, player_ids, team: Team):
+        self.games = {game.id: game for game in games}
+        self.player_ids = set(player_ids)
+        self.team = team
+        game_ids = set(self.games)
+        self.rows = {
+            (row.game_id, row.player_id): row
+            for row in PlayerGameParticipation.objects.filter(
+                game_id__in=game_ids,
+                player_id__in=self.player_ids,
+                team=team,
+            )
+        }
+        self.pas = defaultdict(list)
+        pa_rows = list(
+            PlateAppearance.objects.filter(
+                game_id__in=game_ids,
+                batter_id__in=self.player_ids,
+                batting_team=team,
+            )
+        )
+        for pa in pa_rows:
+            self.pas[(pa.game_id, pa.batter_id)].append(pa)
+        pa_index = {pa.id: pa for pa in pa_rows}
+        self.events = defaultdict(list)
+        for event in HomeRunEvent.objects.filter(
+            plate_appearance_id__in=[pa.id for pa in pa_rows]
+        ):
+            pa = pa_index[event.plate_appearance_id]
+            self.events[(pa.game_id, pa.batter_id)].append(event)
+        self.coverage = {
+            (row.game_id, row.domain): row
+            for row in GameDataCoverage.objects.filter(game_id__in=game_ids)
+        }
+        season_ids = {game.season_id for game in self.games.values()}
+        self.affiliations = defaultdict(list)
+        for row in PlayerTeamAffiliation.objects.filter(
+            player_id__in=self.player_ids
+        ).filter(Q(season_id__in=season_ids) | Q(season__isnull=True)):
+            self.affiliations[row.player_id].append(row)
+
+    def _coverage_gate(self, game, domains):
+        required = _validate_domains(domains)
+        return _gate(
+            tuple(
+                _evidence(game, domain, self.coverage.get((game.id, domain)))
+                for domain in required
+            )
+        )
+
+    def resolve(self, game_id: UUID, player_id: UUID) -> MatrixCellEvidence:
+        game = self.games[game_id]
+        if self.team.id not in (game.home_team_id, game.away_team_id):
+            raise ValueError("Matrix team must participate in the game")
+        row = self.rows.get((game_id, player_id))
+        pas = self.pas[(game_id, player_id)]
+        events = self.events[(game_id, player_id)]
+        event_ids = tuple(sorted(event.id for event in events))
+        if (
+            row
+            and row.participation_state == PlayerGameParticipation.State.DID_NOT_APPEAR
+        ):
+            if pas:
+                return MatrixCellEvidence(
+                    MatrixCellState.INCOMPLETE,
+                    hr_event_ids=event_ids,
+                    reason="TEAM_ATTRIBUTION_CONFLICT",
+                )
+            return MatrixCellEvidence(MatrixCellState.DNP)
+        if row is None:
+            if pas:
+                return MatrixCellEvidence(
+                    MatrixCellState.INCOMPLETE,
+                    hr_event_ids=event_ids,
+                    reason="PARTICIPATION_POPULATION_UNVERIFIED",
+                )
+            if _affirmatively_not_with_team_rows(
+                game, self.team, self.affiliations[player_id]
+            ):
+                return MatrixCellEvidence(MatrixCellState.NOT_WITH_TEAM)
+            participation = self._coverage_gate(
+                game, (GameDataCoverage.Domain.PARTICIPATION,)
+            )
+            state = (
+                MatrixCellState.INCOMPLETE
+                if participation.state == MetricState.INCOMPLETE
+                else MatrixCellState.UNKNOWN
+            )
+            return MatrixCellEvidence(state, reason=participation.reason)
+        if row.participation_state != PlayerGameParticipation.State.APPEARED:
+            if pas:
+                return MatrixCellEvidence(
+                    MatrixCellState.INCOMPLETE,
+                    hr_event_ids=event_ids,
+                    reason="TEAM_ATTRIBUTION_CONFLICT",
+                )
+            return MatrixCellEvidence(MatrixCellState.UNKNOWN)
+        gate = self._coverage_gate(
+            game,
+            (
+                GameDataCoverage.Domain.PLATE_APPEARANCES,
+                GameDataCoverage.Domain.HR_EVENTS,
+            ),
+        )
+        if gate.state == MetricState.UNKNOWN:
+            return MatrixCellEvidence(
+                MatrixCellState.UNKNOWN, hr_event_ids=event_ids, reason=gate.reason
+            )
+        if row.pa_coverage not in (
+            PlayerGameParticipation.Coverage.COMPLETE,
+            PlayerGameParticipation.Coverage.PARTIAL,
+        ):
+            return MatrixCellEvidence(MatrixCellState.UNKNOWN, hr_event_ids=event_ids)
+        if (
+            gate.state == MetricState.INCOMPLETE
+            or row.pa_coverage == PlayerGameParticipation.Coverage.PARTIAL
+        ):
+            return MatrixCellEvidence(
+                MatrixCellState.INCOMPLETE, hr_event_ids=event_ids, reason=gate.reason
+            )
+        pa_integrity = assess_player_pa_integrity([row], pas)
+        if pa_integrity.state != MetricState.VALUE:
+            return MatrixCellEvidence(
+                MatrixCellState.INCOMPLETE,
+                hr_event_ids=event_ids,
+                reason=pa_integrity.reason,
+            )
+        integrity = assess_hr_integrity(pas, events)
+        if integrity.state != MetricState.VALUE:
+            return MatrixCellEvidence(
+                MatrixCellState.INCOMPLETE,
+                hr_event_ids=event_ids,
+                reason=integrity.reason,
+            )
+        if not pas:
+            return MatrixCellEvidence(MatrixCellState.ZERO_PA_APPEARANCE)
+        if events:
+            return MatrixCellEvidence(MatrixCellState.HR_COUNT, len(events), event_ids)
+        return MatrixCellEvidence(MatrixCellState.KNOWN_ZERO, 0)
+
+
 def resolve_matrix_cell(game: Game, player: Player, team: Team) -> MatrixCellEvidence:
     """Resolve one team-game cell from affirmative participation and current proof."""
-    if team.id not in (game.home_team_id, game.away_team_id):
-        raise ValueError("Matrix team must participate in the game")
-    row = PlayerGameParticipation.objects.filter(
-        game=game, player=player, team=team
-    ).first()
-    pas = list(
-        PlateAppearance.objects.filter(game=game, batter=player, batting_team=team)
-    )
-    events = list(
-        HomeRunEvent.objects.filter(plate_appearance_id__in=[pa.id for pa in pas])
-    )
-    event_ids = tuple(sorted(event.id for event in events))
-    if (
-        row is not None
-        and row.participation_state == PlayerGameParticipation.State.DID_NOT_APPEAR
-    ):
-        if pas:
-            return MatrixCellEvidence(
-                MatrixCellState.INCOMPLETE,
-                hr_event_ids=event_ids,
-                reason="TEAM_ATTRIBUTION_CONFLICT",
-            )
-        return MatrixCellEvidence(MatrixCellState.DNP)
-    if row is None:
-        if pas:
-            return MatrixCellEvidence(
-                MatrixCellState.INCOMPLETE,
-                hr_event_ids=event_ids,
-                reason="PARTICIPATION_POPULATION_UNVERIFIED",
-            )
-        if _affirmatively_not_with_team(game, player, team):
-            return MatrixCellEvidence(MatrixCellState.NOT_WITH_TEAM)
-        participation = evaluate_game_coverage(
-            game, (GameDataCoverage.Domain.PARTICIPATION,)
-        )
-        state = (
-            MatrixCellState.INCOMPLETE
-            if participation.state == MetricState.INCOMPLETE
-            else MatrixCellState.UNKNOWN
-        )
-        return MatrixCellEvidence(state, reason=participation.reason)
-    if row.participation_state != PlayerGameParticipation.State.APPEARED:
-        if pas:
-            return MatrixCellEvidence(
-                MatrixCellState.INCOMPLETE,
-                hr_event_ids=event_ids,
-                reason="TEAM_ATTRIBUTION_CONFLICT",
-            )
-        return MatrixCellEvidence(MatrixCellState.UNKNOWN)
-    gate = evaluate_game_coverage(
-        game,
-        (GameDataCoverage.Domain.PLATE_APPEARANCES, GameDataCoverage.Domain.HR_EVENTS),
-    )
-    if gate.state == MetricState.UNKNOWN:
-        return MatrixCellEvidence(
-            MatrixCellState.UNKNOWN, hr_event_ids=event_ids, reason=gate.reason
-        )
-    if row.pa_coverage not in (
-        PlayerGameParticipation.Coverage.COMPLETE,
-        PlayerGameParticipation.Coverage.PARTIAL,
-    ):
-        return MatrixCellEvidence(MatrixCellState.UNKNOWN, hr_event_ids=event_ids)
-    if (
-        gate.state == MetricState.INCOMPLETE
-        or row.pa_coverage == PlayerGameParticipation.Coverage.PARTIAL
-    ):
-        return MatrixCellEvidence(
-            MatrixCellState.INCOMPLETE, hr_event_ids=event_ids, reason=gate.reason
-        )
-    pa_integrity = assess_player_pa_integrity([row], pas)
-    if pa_integrity.state != MetricState.VALUE:
-        return MatrixCellEvidence(
-            MatrixCellState.INCOMPLETE,
-            hr_event_ids=event_ids,
-            reason=pa_integrity.reason,
-        )
-    integrity = assess_hr_integrity(pas, events)
-    if integrity.state != MetricState.VALUE:
-        return MatrixCellEvidence(
-            MatrixCellState.INCOMPLETE,
-            hr_event_ids=event_ids,
-            reason=integrity.reason,
-        )
-    if not pas:
-        return MatrixCellEvidence(MatrixCellState.ZERO_PA_APPEARANCE)
-    if events:
-        return MatrixCellEvidence(MatrixCellState.HR_COUNT, len(events), event_ids)
-    return MatrixCellEvidence(MatrixCellState.KNOWN_ZERO, 0)
+    return MatrixEvidenceIndex([game], [player.id], team).resolve(game.id, player.id)

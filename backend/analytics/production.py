@@ -1,9 +1,12 @@
 """B09 production and frequency KPIs over an already selected game window."""
 
 from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal, localcontext
+from uuid import UUID
 
 from domain.models import (
+    Game,
     GameDataCoverage,
     HomeRunEvent,
     PlateAppearance,
@@ -14,10 +17,19 @@ from .coverage import (
     CoverageGate,
     assess_hr_integrity,
     assess_player_pa_integrity,
+    evaluate_games_coverage,
     evaluate_selection_coverage,
 )
 from .values import MetricState, MetricValue
 from .windows import MembershipState, SelectionResult
+
+
+@dataclass(frozen=True)
+class PlayerObservationMetrics:
+    game_id: UUID
+    pa: MetricValue
+    hr: MetricValue
+
 
 _UNITS = {
     "hr": "HR",
@@ -279,3 +291,84 @@ def compute_player_production_metrics(
 ) -> dict[str, MetricValue]:
     """Calculate eight player KPIs from exact B07 scoped PA identities."""
     return _compute(selection, "PLAYER")
+
+
+def player_observation_metrics(
+    selection: SelectionResult,
+) -> tuple[PlayerObservationMetrics, ...]:
+    """Return per-game PA/HR evidence for a definitive player selection."""
+    _validate_selection(selection, "PLAYER")
+    if selection.membership_state != MembershipState.RESOLVED:
+        return ()
+    game_ids = [entry.game_id for entry in selection.entries]
+    games = list(Game.objects.filter(id__in=game_ids))
+    coverage = evaluate_games_coverage(games, (GameDataCoverage.Domain.HR_EVENTS,))
+    all_pas = list(PlateAppearance.objects.filter(game_id__in=game_ids))
+    all_events = list(
+        HomeRunEvent.objects.filter(
+            plate_appearance__game_id__in=game_ids
+        ).select_related("plate_appearance")
+    )
+    rows = {
+        row.id: row
+        for row in PlayerGameParticipation.objects.filter(
+            id__in={
+                row_id
+                for entry in selection.entries
+                for row_id in entry.participation_ids
+            }
+        )
+    }
+    pas_by_game = defaultdict(list)
+    events_by_game = defaultdict(list)
+    for pa in all_pas:
+        pas_by_game[pa.game_id].append(pa)
+    for event in all_events:
+        events_by_game[event.plate_appearance.game_id].append(event)
+    result = []
+    for entry in selection.entries:
+        pa_ids = set(entry.plate_appearance_ids)
+        scoped_pas = [pa for pa in pas_by_game[entry.game_id] if pa.id in pa_ids]
+        expected_rows = set(entry.participation_ids)
+        pa_gate = CoverageGate(MetricState.VALUE)
+        if (
+            {pa.id for pa in scoped_pas} != pa_ids
+            or not expected_rows.issubset(rows)
+            or any(
+                rows[row_id].game_id != entry.game_id
+                or rows[row_id].player_id != selection.subject_id
+                or rows[row_id].team_id not in entry.represented_team_ids
+                for row_id in expected_rows
+            )
+            or any(
+                pa.batter_id != selection.subject_id
+                or pa.batting_team_id not in entry.represented_team_ids
+                for pa in scoped_pas
+            )
+        ):
+            pa_gate = CoverageGate(MetricState.INCOMPLETE, "BOX_SCORE_PA_MISMATCH")
+        else:
+            pa_gate = assess_player_pa_integrity(
+                [rows[row_id] for row_id in expected_rows], scoped_pas
+            )
+        game_integrity = assess_hr_integrity(
+            pas_by_game[entry.game_id], events_by_game[entry.game_id]
+        )
+        hr_gate = _stronger_gate(coverage[entry.game_id], game_integrity, pa_gate)
+        pa_metric = (
+            _value(len(scoped_pas), "PA", len(scoped_pas))
+            if pa_gate.state == MetricState.VALUE
+            else _unavailable(pa_gate, "PA")
+        )
+        scoped_ids = {pa.id for pa in scoped_pas}
+        hr_count = sum(
+            event.plate_appearance_id in scoped_ids
+            for event in events_by_game[entry.game_id]
+        )
+        hr_metric = (
+            _value(hr_count, "HR", hr_count)
+            if hr_gate.state == MetricState.VALUE
+            else _unavailable(hr_gate, "HR")
+        )
+        result.append(PlayerObservationMetrics(entry.game_id, pa_metric, hr_metric))
+    return tuple(result)

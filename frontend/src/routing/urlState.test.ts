@@ -49,12 +49,13 @@ describe('URL state', () => {
   it('validates Teams and restores independent Team Detail tab pages', () => {
     expect(parseUrlState(new URLSearchParams('season=2099&league=AL&division=East&search=Synthetic&ordering=name&page=2'), 'teams').issues).toEqual([])
     expect(parseUrlState(new URLSearchParams('season=2099&window=7G'), 'teams').issues).toHaveLength(1)
-    const source = new URLSearchParams('season=2099&tab=hr-log&discovery_page=2&comparison_page=3&games_page=4&hr_page=5')
+    const source = new URLSearchParams('season=2099&tab=hr-log&discovery_page=2&comparison_page=3&games_page=4&hr_page=5&hr_ordering=-official_date')
     const parsed = parseUrlState(source, 'teamDetail')
     expect(parsed.issues).toEqual([])
     expect(parseUrlState(new URLSearchParams(parsed.validParams), 'teamDetail').state).toMatchObject({
-      discovery_page: '2', comparison_page: '3', games_page: '4', hr_page: '5', tab: 'hr-log',
+      discovery_page: '2', comparison_page: '3', games_page: '4', hr_page: '5', hr_ordering: '-official_date', tab: 'hr-log',
     })
+    expect(parseUrlState(new URLSearchParams('season=2099&hr_ordering=newest'), 'teamDetail').issues).toHaveLength(1)
     expect(parseUrlState(new URLSearchParams('season=2099&tab=recurrence'), 'teamDetail').issues).toHaveLength(1)
   })
 })

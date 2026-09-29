@@ -71,6 +71,8 @@ describe('Team Detail vertical slice', () => {
     expect(urls.filter((url) => url.startsWith(`/api/v1/teams/${UUIDS.teamA}/`))).toHaveLength(1)
     expect(urls.some((url) => url.startsWith('/api/v1/players/'))).toBe(false)
     expect(urls.some((url) => url.startsWith('/api/v1/games/'))).toBe(false)
+    expect(screen.getByText('Recurrence matrix — UI coming in B19')).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByRole('link', { name: 'Open team recurrence' })).not.toBeInTheDocument()
   })
 
   it('loads Players independently, labels association honestly, and keeps detail on panel failure', async () => {
@@ -125,6 +127,16 @@ describe('Team Detail vertical slice', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-runs/') && String(url).includes('page=3'))).toBe(true)
     fireEvent.change(screen.getByRole('combobox', { name: 'Home / away' }), { target: { value: 'HOME' } })
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-runs/') && String(url).includes('home_away=HOME') && String(url).includes('page=1'))).toBe(true))
+  })
+
+  it('maps HR event order from URL state and resets only HR pagination', async () => {
+    const fetchMock = installApi()
+    renderApp(`/teams/${UUIDS.teamA}?season=2099&tab=hr-log&hr_ordering=-official_date&hr_page=3`)
+    const order = await screen.findByRole('combobox', { name: 'Event order' })
+    expect(order).toHaveValue('-official_date')
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-runs/') && String(url).includes('ordering=-official_date') && String(url).includes('page=3'))).toBe(true)
+    fireEvent.change(order, { target: { value: 'official_date' } })
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/home-runs/') && String(url).includes('ordering=official_date') && String(url).includes('page=1'))).toBe(true))
   })
 
   it('keeps the base Team resource visible when HR Log fails', async () => {

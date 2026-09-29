@@ -26,6 +26,16 @@ class GapSeries:
     reason: str | None
     hr_game_count: int | None
     gap_count: int | None
+    records: tuple["GapRecord", ...] = ()
+
+
+@dataclass(frozen=True)
+class GapRecord:
+    """One public-ready interval between verified HR-game endpoints."""
+
+    from_game_id: UUID
+    to_game_id: UUID
+    non_hr_games: MetricValue
 
 
 @dataclass(frozen=True)
@@ -247,6 +257,45 @@ def _window_order_gate(
     return CoverageGate(MetricState.VALUE)
 
 
+def _gap_records(observations: list[_Observation]) -> tuple[GapRecord, ...]:
+    """Keep only endpoint pairs proven without an evidence or order barrier."""
+    records = []
+    last_hr = None
+    non_hr_games = 0
+    for group in _groups(observations):
+        if any(
+            item.gate.state != MetricState.VALUE for item in group
+        ) or _order_material(group, pa=False):
+            last_hr = None
+            non_hr_games = 0
+            continue
+        if len(group) > 1 and all(item.hr_game for item in group):
+            # Aggregate streak results are order-invariant, but endpoint UUID pairs
+            # inside an ID-only tie are not established sporting order.
+            last_hr = None
+            non_hr_games = 0
+            continue
+        for item in group:
+            if item.hr_game:
+                if last_hr is not None:
+                    records.append(
+                        GapRecord(
+                            last_hr.candidate.game_id,
+                            item.candidate.game_id,
+                            _metric(
+                                non_hr_games,
+                                "GAMES",
+                                numerator=non_hr_games,
+                            ),
+                        )
+                    )
+                last_hr = item
+                non_hr_games = 0
+            elif last_hr is not None:
+                non_hr_games += 1
+    return tuple(records)
+
+
 def _current(
     observations: list[_Observation], *, target_hr: bool, pa: bool = False
 ) -> MetricValue:
@@ -321,6 +370,7 @@ def _calculate(selection: SelectionResult, subject_kind: str) -> RecurrenceResul
         if local_gate.state == MetricState.VALUE
         else local_gate
     )
+    gap_records = _gap_records(window)
     if local_gate.state != MetricState.VALUE:
         gaps = GapSeries(
             f"{prefix}.hr_gap_games",
@@ -329,6 +379,7 @@ def _calculate(selection: SelectionResult, subject_kind: str) -> RecurrenceResul
             local_gate.reason,
             None,
             None,
+            gap_records,
         )
         for name in local_names:
             metrics[f"{prefix}.{name}"] = _unavailable(local_gate, units[name])
@@ -379,6 +430,7 @@ def _calculate(selection: SelectionResult, subject_kind: str) -> RecurrenceResul
                 None,
                 len(indices),
                 len(gap_values),
+                gap_records,
             )
             with localcontext() as context:
                 context.prec = 50

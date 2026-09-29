@@ -3,7 +3,11 @@
 from collections import defaultdict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.db.models import Q
+
 from analytics.coverage import (
+    MatrixCellState,
+    MatrixEvidenceIndex,
     assess_hr_integrity,
     assess_player_pa_integrity,
     evaluate_game_coverage,
@@ -11,6 +15,7 @@ from analytics.coverage import (
 from analytics.production import (
     compute_player_production_metrics,
     compute_team_production_metrics,
+    player_observation_metrics,
 )
 from analytics.recurrence import compute_player_recurrence, compute_team_recurrence
 from analytics.values import MetricState, MetricValue
@@ -22,6 +27,8 @@ from domain.models import (
     PlateAppearance,
     Player,
     PlayerGameParticipation,
+    PlayerTeamAffiliation,
+    Team,
 )
 from ingestion.models import FactSourceLink
 
@@ -346,6 +353,196 @@ def team_analytics(team, selection):
         "scope": _scope(selection),
         "coverage": selection_coverage(selection),
     }
+
+
+def _coverage_by_game(games):
+    games = list(games)
+    rows = defaultdict(dict)
+    for row in GameDataCoverage.objects.filter(game_id__in=[game.id for game in games]):
+        rows[row.game_id][row.domain] = row
+    return {
+        game.id: [
+            {
+                "domain": domain,
+                "state": rows[game.id][domain].state
+                if domain in rows[game.id]
+                else GameDataCoverage.State.UNKNOWN,
+                "reason_codes": [rows[game.id][domain].reason_code]
+                if domain in rows[game.id] and rows[game.id][domain].reason_code
+                else [],
+            }
+            for domain in GameDataCoverage.Domain.values
+        ]
+        for game in games
+    }
+
+
+def _matrix_players(selection, team, games):
+    game_ids = [game.id for game in games]
+    player_ids = set(
+        PlayerGameParticipation.objects.filter(
+            game_id__in=game_ids, team=team
+        ).values_list("player_id", flat=True)
+    )
+    player_ids.update(
+        PlateAppearance.objects.filter(
+            game_id__in=game_ids, batting_team=team
+        ).values_list("batter_id", flat=True)
+    )
+    if games:
+        first_day = min(game.official_date for game in games)
+        last_day = max(game.official_date for game in games)
+        affiliations = PlayerTeamAffiliation.objects.filter(team=team).filter(
+            Q(season_id=selection.season_id) | Q(season__isnull=True)
+        )
+        affiliations = affiliations.filter(
+            ~Q(boundary_precision=PlayerTeamAffiliation.BoundaryPrecision.DATE)
+            | (
+                (
+                    Q(effective_from_date__isnull=True)
+                    | Q(effective_from_date__lte=last_day)
+                )
+                & (
+                    Q(effective_to_date_exclusive__isnull=True)
+                    | Q(effective_to_date_exclusive__gt=first_day)
+                )
+            )
+        )
+        player_ids.update(affiliations.values_list("player_id", flat=True))
+    return list(Player.objects.filter(id__in=player_ids).order_by("id"))
+
+
+def _matrix_cell(cell):
+    positive = cell.state == MatrixCellState.HR_COUNT
+    return {
+        "state": cell.state.value,
+        "hr_count": cell.hr_count,
+        "home_run_event_ids": [str(value) for value in cell.hr_event_ids]
+        if positive
+        else [],
+        "reason": cell.reason,
+    }
+
+
+def _matrix_window_hr(cells):
+    unknown = next(
+        (cell for cell in cells if cell.state == MatrixCellState.UNKNOWN), None
+    )
+    if unknown:
+        return MetricValue(MetricState.UNKNOWN, unit="HR", reason=unknown.reason)
+    incomplete = next(
+        (cell for cell in cells if cell.state == MatrixCellState.INCOMPLETE), None
+    )
+    if incomplete:
+        return MetricValue(MetricState.INCOMPLETE, unit="HR", reason=incomplete.reason)
+    total = sum(cell.hr_count or 0 for cell in cells)
+    return MetricValue(MetricState.VALUE, value=total, unit="HR", numerator=total)
+
+
+def team_recurrence(team, selection):
+    """Compose a shared-column team matrix from batched B08 evidence."""
+    base = team_analytics(team, selection)
+    if selection.membership_state != MembershipState.RESOLVED:
+        return {**base, "columns": [], "rows": []}
+    ordered_ids = [entry.game_id for entry in selection.entries]
+    game_map = {
+        game.id: game
+        for game in Game.objects.filter(id__in=ordered_ids).select_related(
+            "home_team", "away_team"
+        )
+    }
+    games = [game_map[game_id] for game_id in ordered_ids]
+    coverage = _coverage_by_game(games)
+    columns = []
+    for game in games:
+        home = game.home_team_id == team.id
+        columns.append(
+            {
+                "game_id": str(game.id),
+                "official_date": game.official_date,
+                "scheduled_game_number": game.scheduled_game_number,
+                "opponent": team_summary(game.away_team if home else game.home_team),
+                "home_away": "HOME" if home else "AWAY",
+                "game_status": game.status,
+                "coverage": coverage[game.id],
+            }
+        )
+    players = _matrix_players(selection, team, games)
+    evidence = MatrixEvidenceIndex(games, [player.id for player in players], team)
+    cutoff = selection.resolved_cutoff.official_date
+    rows = []
+    for player in players:
+        cells = [evidence.resolve(game.id, player.id) for game in games]
+        season_selection = select_player_window(
+            season=selection.season_year,
+            player=player,
+            window="SEASON",
+            cutoff=cutoff,
+        )
+        season_hr = compute_player_production_metrics(season_selection)["player.hr"]
+        rows.append(
+            {
+                "player": player_summary(player),
+                "player_season_hr": metric_value(season_hr),
+                "window_hr": metric_value(_matrix_window_hr(cells)),
+                "cells": [_matrix_cell(cell) for cell in cells],
+            }
+        )
+    return {**base, "columns": columns, "rows": rows}
+
+
+def player_recurrence(player, selection, requested_team=None):
+    """Compose canonical batting-game observations and endpoint-aware gaps."""
+    recurrence = compute_player_recurrence(selection)
+    production = compute_player_production_metrics(selection)
+    production.update(recurrence.metrics)
+    base = {
+        "player": player_summary(
+            player, represented_team_for_selection(selection, requested_team)
+        ),
+        "metrics": {name: metric_value(value) for name, value in production.items()},
+        "scope": _scope(selection),
+        "coverage": selection_coverage(selection),
+    }
+    if selection.membership_state != MembershipState.RESOLVED:
+        return {**base, "observations": [], "gaps": []}
+    games = {
+        game.id: game
+        for game in Game.objects.filter(
+            id__in=[entry.game_id for entry in selection.entries]
+        )
+    }
+    team_ids = {
+        team_id for entry in selection.entries for team_id in entry.represented_team_ids
+    }
+    teams = {team.id: team for team in Team.objects.filter(id__in=team_ids)}
+    observations = {
+        item.game_id: item for item in player_observation_metrics(selection)
+    }
+    result = []
+    for entry in selection.entries:
+        item = observations[entry.game_id]
+        result.append(
+            {
+                "game_id": str(entry.game_id),
+                "official_date": games[entry.game_id].official_date,
+                "represented_teams": [
+                    team_summary(teams[team_id])
+                    for team_id in entry.represented_team_ids
+                ],
+                "pa": metric_value(item.pa),
+                "hr": metric_value(item.hr),
+            }
+        )
+    gaps = [
+        {
+            "from_game_id": str(record.from_game_id),
+            "to_game_id": str(record.to_game_id),
+            "non_hr_games": metric_value(record.non_hr_games),
+        }
+        for record in recurrence.gap_series.records
+    ]
+    return {**base, "observations": result, "gaps": gaps}
 
 
 def _order_home_run_events(events, selection, *, descending=False):
