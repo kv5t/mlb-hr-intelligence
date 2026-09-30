@@ -1,3 +1,4 @@
+import { ExportActions } from '@/components/ExportActions'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 
@@ -94,6 +95,7 @@ function TeamRecurrenceContent({ teamId, seasons, seasonsError }: {
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{response.team.display_name ?? 'Team'} recurrence</h1>
         <p className="mt-1 text-sm text-muted-foreground">Player evidence across the selected team-game window.</p>
       </header>
+      <ExportActions target={{ kind: 'teamRecurrence', id: teamId, params }} />
       <MatrixFilters change={change} rowOrder={rowOrder} seasons={seasons} seasonsError={seasonsError} state={state} />
       {query.isFetching ? <RefreshingStatus /> : null}
       <ScopeSummary response={response} />

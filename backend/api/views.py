@@ -33,21 +33,17 @@ from .errors import ApiProblem
 from .pagination import paginate
 from .serializers import player_summary, season_summary, team_summary
 from .services import (
-    _scope,
     game_detail,
+    home_run_scope,
     order_home_run_events,
     player_analytics_row,
     player_home_run_events,
-    player_metrics,
     player_recurrence,
     public_game,
     public_home_run_events,
-    represented_team_for_selection,
     schedule_date,
-    selection_coverage,
     team_analytics,
     team_home_run_events,
-    team_hr_total,
     team_recurrence,
     today_coverage,
     today_games,
@@ -424,14 +420,7 @@ class TeamHomeRunsView(ReadOnlyView):
             order_home_run_events(events, selection, descending=True)
         page = paginate(request, events, lambda event: event)
         page["results"] = public_home_run_events(page["results"])
-        page.update(
-            {
-                "team": team_summary(team),
-                "total_hr": team_hr_total(selection),
-                "scope": _scope(selection),
-                "coverage": selection_coverage(selection),
-            }
-        )
+        page.update(home_run_scope(team, selection))
         return Response(page)
 
 
@@ -549,6 +538,64 @@ class PlayerDetailView(ReadOnlyView):
         return Response(player_analytics_row(player, selection, team))
 
 
+def player_leaderboard_rows(request):
+    """Full ordered public rows, shared by JSON pagination and file exports."""
+    season, window, team, home_away, cutoff = _analytical_inputs(request)
+    raw_ordering = request.query_params.get("ordering", "-hr")
+    descending = raw_ordering.startswith("-")
+    ordering = raw_ordering[1:] if descending else raw_ordering
+    if ordering != "name" and ordering not in _LEADERBOARD_ORDERING:
+        raise ApiProblem(
+            "INVALID_FILTER",
+            "Unsupported ordering",
+            details={"ordering": "unsupported"},
+        )
+    candidates = _player_candidates(
+        season,
+        team,
+        cutoff=cutoff,
+        search=request.query_params.get("search"),
+        position=request.query_params.get("position"),
+        bats=request.query_params.get("bats"),
+    )
+    rows = []
+    for player in candidates:
+        selection = _select_player(
+            player=player,
+            season=season,
+            window=window,
+            team=team,
+            home_away=home_away,
+            cutoff=cutoff,
+        )
+        rows.append(player_analytics_row(player, selection, team))
+
+    if ordering == "name":
+        available = [row for row in rows if row["player"]["display_name"]]
+        unavailable = [row for row in rows if not row["player"]["display_name"]]
+        available.sort(key=lambda row: row["player"]["id"])
+        available.sort(
+            key=lambda row: row["player"]["display_name"].casefold(),
+            reverse=descending,
+        )
+        unavailable.sort(key=lambda row: row["player"]["id"])
+        rows = available + unavailable
+    else:
+        metric_id = _LEADERBOARD_ORDERING[ordering]
+        rows.sort(key=lambda row: row["player"]["id"])
+        rows.sort(
+            key=lambda row: (
+                row["metrics"][metric_id]["state"] != "VALUE",
+                -row["metrics"][metric_id]["value"]
+                if descending and row["metrics"][metric_id]["state"] == "VALUE"
+                else row["metrics"][metric_id]["value"]
+                if row["metrics"][metric_id]["state"] == "VALUE"
+                else 0,
+            )
+        )
+    return rows
+
+
 class PlayerLeaderboardView(ReadOnlyView):
     def get(self, request):
         _parameters(
@@ -556,59 +603,7 @@ class PlayerLeaderboardView(ReadOnlyView):
             _PLAYER_ANALYTICAL_PARAMETERS
             | {"search", "position", "bats", "ordering", "page", "page_size"},
         )
-        season, window, team, home_away, cutoff = _analytical_inputs(request)
-        raw_ordering = request.query_params.get("ordering", "-hr")
-        descending = raw_ordering.startswith("-")
-        ordering = raw_ordering[1:] if descending else raw_ordering
-        if ordering != "name" and ordering not in _LEADERBOARD_ORDERING:
-            raise ApiProblem(
-                "INVALID_FILTER",
-                "Unsupported ordering",
-                details={"ordering": "unsupported"},
-            )
-        candidates = _player_candidates(
-            season,
-            team,
-            cutoff=cutoff,
-            search=request.query_params.get("search"),
-            position=request.query_params.get("position"),
-            bats=request.query_params.get("bats"),
-        )
-        rows = []
-        for player in candidates:
-            selection = _select_player(
-                player=player,
-                season=season,
-                window=window,
-                team=team,
-                home_away=home_away,
-                cutoff=cutoff,
-            )
-            rows.append(player_analytics_row(player, selection, team))
-
-        if ordering == "name":
-            available = [row for row in rows if row["player"]["display_name"]]
-            unavailable = [row for row in rows if not row["player"]["display_name"]]
-            available.sort(key=lambda row: row["player"]["id"])
-            available.sort(
-                key=lambda row: row["player"]["display_name"].casefold(),
-                reverse=descending,
-            )
-            unavailable.sort(key=lambda row: row["player"]["id"])
-            rows = available + unavailable
-        else:
-            metric_id = _LEADERBOARD_ORDERING[ordering]
-            rows.sort(key=lambda row: row["player"]["id"])
-            rows.sort(
-                key=lambda row: (
-                    row["metrics"][metric_id]["state"] != "VALUE",
-                    -row["metrics"][metric_id]["value"]
-                    if descending and row["metrics"][metric_id]["state"] == "VALUE"
-                    else row["metrics"][metric_id]["value"]
-                    if row["metrics"][metric_id]["state"] == "VALUE"
-                    else 0,
-                )
-            )
+        rows = player_leaderboard_rows(request)
         return Response(paginate(request, rows, lambda row: row))
 
 
@@ -638,30 +633,10 @@ class PlayerHomeRunsView(ReadOnlyView):
             cutoff=cutoff,
         )
         events = player_home_run_events(selection)
-        if ordering.startswith("-"):
-            game_ranks = {
-                entry.game_id: index for index, entry in enumerate(selection.entries)
-            }
-            events.sort(
-                key=lambda event: (
-                    -game_ranks[event.plate_appearance.game_id],
-                    event.plate_appearance.game_pa_ordinal is None,
-                    event.plate_appearance.game_pa_ordinal or 0,
-                    event.id,
-                )
-            )
+        order_home_run_events(events, selection, descending=ordering.startswith("-"))
         page = paginate(request, events, lambda event: event)
         page["results"] = public_home_run_events(page["results"])
-        page.update(
-            {
-                "player": player_summary(
-                    player, represented_team_for_selection(selection, team)
-                ),
-                "total_hr": player_metrics(selection)["player.hr"],
-                "scope": _scope(selection),
-                "coverage": selection_coverage(selection),
-            }
-        )
+        page.update(home_run_scope(player, selection, team))
         return Response(page)
 
 

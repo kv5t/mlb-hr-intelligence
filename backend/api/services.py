@@ -757,3 +757,23 @@ def today_coverage(games):
             }
         )
     return result
+
+
+def home_run_scope(subject, selection, requested_team=None):
+    """Authoritative metadata for both JSON HR logs and their full exports."""
+    if selection.subject_kind == "TEAM":
+        identity = {"team": team_summary(subject)}
+        total = team_hr_total(selection)
+    else:
+        identity = {
+            "player": player_summary(
+                subject, represented_team_for_selection(selection, requested_team)
+            )
+        }
+        total = player_metrics(selection)["player.hr"]
+    return {
+        **identity,
+        "total_hr": total,
+        "scope": _scope(selection),
+        "coverage": selection_coverage(selection),
+    }

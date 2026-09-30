@@ -1,3 +1,4 @@
+import { ExportActions } from '@/components/ExportActions'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { usePlayerRecurrence } from '@/api'
 import { EmptyState } from '@/components/PageStates'
@@ -17,7 +18,7 @@ function PlayerRecurrenceContent() {
   const query = usePlayerRecurrence(playerId, playerAnalyticalParams(state))
   const response = query.data
   const from = `${location.pathname}${location.search}`
-  return <PlayerQueryState query={query}>{response ? <div className="space-y-6"><PlayerHeader player={response.player} state={state} title="Recurrence" /><PlayerFilters state={state} /><PlayerScopeSummary scope={response.scope} /><PlayerMetricGroup title="Recurrence summary" metrics={response.metrics} items={[
+  return <PlayerQueryState query={query}>{response ? <div className="space-y-6"><PlayerHeader player={response.player} state={state} title="Recurrence" /><PlayerFilters state={state} /><ExportActions target={{ kind: 'playerRecurrence', id: playerId, params: playerAnalyticalParams(state) }} /><PlayerScopeSummary scope={response.scope} /><PlayerMetricGroup title="Recurrence summary" metrics={response.metrics} items={[
     ['player.hr_game_pct', 'Games With HR %'], ['player.avg_hr_gap_games', 'Average HR Gap'], ['player.median_hr_gap_games', 'Median HR Gap'], ['player.current_hr_drought_games', 'Current HR Drought — Batting Games'], ['player.max_hr_drought_games', 'Maximum HR Drought — Batting Games'], ['player.current_hr_streak_games', 'Current HR Streak'], ['player.max_hr_streak_games', 'Maximum HR Streak'], ['player.current_hr_drought_pa', 'Current HR Drought — PA'], ['player.max_hr_drought_pa', 'Maximum HR Drought — PA'],
   ]} />{response.scope.selection_state !== 'VALUE' ? <PlayerUnresolved scope={response.scope} /> : !response.observations.length ? <EmptyState>No eligible batting games in this resolved scope.</EmptyState> : <>
     <section aria-labelledby="player-strip-title"><h2 className="text-xl font-semibold" id="player-strip-title">Chronological HR strip</h2><ol className="mt-3 flex gap-2 overflow-x-auto pb-2">{response.observations.map((observation) => <li className="shrink-0 rounded-lg border p-3" key={observation.game_id}><Link className="inline-flex min-h-11 flex-col justify-center gap-2 underline" state={{ from }} to={`/games/${observation.game_id}`}><span className="text-xs">{observation.official_date}</span><MetricValueView label={`${observation.official_date} HR`} metric={observation.hr} /></Link></li>)}</ol></section>

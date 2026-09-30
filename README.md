@@ -166,6 +166,31 @@ npm run test
 npm run build
 ```
 
+## Synchronous CSV and PDF exports
+
+The five analytical export families under `/api/v1/exports/` require `format=csv|pdf` and export the full selected scope without pagination. They reuse the JSON analytical services and publication revision. Exports run synchronously; large matrices can take several seconds. Measurements and the provisional performance issue are recorded in [B21_EXPORT_BENCHMARK.md](docs/product/B21_EXPORT_BENCHMARK.md).
+
+`backend/requirements.txt` pins **WeasyPrint 70.0** for server-side HTML/CSS PDF rendering. Installing Python requirements also installs its Python dependencies. Native Pango libraries and a usable font must be installed on the serving machine:
+
+```bash
+# Debian/Ubuntu (also used in Backend CI)
+sudo apt-get install libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core
+
+# macOS with Homebrew
+brew install pango
+export DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib"
+```
+
+Set the macOS library path in the environment that starts Django and runs PDF tests. The Homebrew Pango library path was required and verified on the development Mac. See the [official WeasyPrint installation guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html) for other platforms.
+
+With the explicitly prepared synthetic demo and Django running, smoke a download:
+
+```bash
+curl --fail --output /tmp/mlb-leaderboard.pdf 'http://127.0.0.1:8000/api/v1/exports/leaderboards/players/?season=2099&window=7G&cutoff=2099-04-03&format=pdf'
+```
+
+The response is an attachment with revision, as-of and scope headers. CSV/PDF keep unknown or incomplete values nonnumeric; the count of verified HR-event records is separate from the authoritative HR total. There is no frontend PDF generator or asynchronous export job.
+
 ## Continuous integration
 
 GitHub Actions runs deterministic Backend CI and Frontend CI on pushes and pull requests. CI requires no secrets, external services, or live provider HTTP. Backend CI checks formatting, lint, Django configuration, migrations, and tests. Frontend CI uses `npm ci`, then typecheck, lint, tests, and a production build.

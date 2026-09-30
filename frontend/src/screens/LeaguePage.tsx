@@ -1,3 +1,4 @@
+import { ExportActions } from '@/components/ExportActions'
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -48,6 +49,7 @@ function LeagueContent({ season, seasons, seasonsError, seasonsPending, retrySea
       {leaderboard.isPending ? <InitialLoading label="Loading player leaderboard" /> : null}
       {leaderboard.error ? <ErrorState error={leaderboard.error} onRetry={() => void leaderboard.refetch()} /> : null}
       {leaderboard.data ? <>
+        <ExportActions target={{ kind: 'leaderboard', params }} />
         {leaderboard.isFetching ? <RefreshingStatus /> : null}
         {partial ? <PartialDataNotice>Players remain visible when one or more metrics are unavailable or partial.</PartialDataNotice> : null}
         {leaderboard.data.results.length ? <PlayerLeaderboardTable onSort={sort} ordering={effectiveOrdering} rows={leaderboard.data.results} /> : <EmptyState>No players match this analytical scope.</EmptyState>}
