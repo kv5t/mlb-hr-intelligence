@@ -47,3 +47,8 @@ export type TeamRecurrenceResponse = z.infer<typeof teamRecurrenceResponseSchema
 export type MatrixCell = z.infer<typeof matrixCellSchema>
 export type MatrixColumn = z.infer<typeof matrixColumnSchema>
 export type MatrixPlayerRow = z.infer<typeof matrixPlayerRowSchema>
+
+
+export type PlayerDetailResponse = z.infer<typeof import('./schemas').playerDetailResponseSchema>
+export type PlayerRecurrenceResponse = z.infer<typeof import('./schemas').playerRecurrenceResponseSchema>
+export type PlayerHomeRunsResponse = z.infer<typeof import('./schemas').playerHomeRunsResponseSchema>

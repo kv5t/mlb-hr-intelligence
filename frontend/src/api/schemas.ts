@@ -351,3 +351,49 @@ export const todayResponseSchema = z.object({
   coverage: z.array(coverageSummarySchema),
   meta: metaSchema,
 })
+
+
+export const requiredPlayerMetricsSchema = requiredLeaderboardMetricsSchema.extend({
+  'player.hr_games': metricValueSchema,
+  'player.multi_hr_games': metricValueSchema,
+  'player.avg_hr_gap_games': metricValueSchema,
+  'player.max_hr_drought_games': metricValueSchema,
+  'player.current_hr_drought_pa': metricValueSchema,
+  'player.max_hr_drought_pa': metricValueSchema,
+  'player.current_hr_streak_games': metricValueSchema,
+  'player.max_hr_streak_games': metricValueSchema,
+})
+
+export const playerDetailResponseSchema = z.object({
+  player: playerSummarySchema,
+  metrics: requiredPlayerMetricsSchema,
+  scope: leaderScopeSchema,
+  coverage: z.array(coverageSummarySchema),
+  meta: metaSchema,
+})
+
+export const playerObservationSchema = z.object({
+  game_id: uuid,
+  official_date: isoDate,
+  represented_teams: z.array(teamSummarySchema),
+  pa: metricValueSchema,
+  hr: metricValueSchema,
+})
+
+export const playerGapSchema = z.object({
+  from_game_id: uuid,
+  to_game_id: uuid,
+  non_hr_games: metricValueSchema,
+})
+
+export const playerRecurrenceResponseSchema = playerDetailResponseSchema.extend({
+  observations: z.array(playerObservationSchema),
+  gaps: z.array(playerGapSchema),
+})
+
+export const playerHomeRunsResponseSchema = paginatedSchema(homeRunEventSummarySchema).extend({
+  player: playerSummarySchema,
+  total_hr: metricValueSchema,
+  scope: leaderScopeSchema,
+  coverage: z.array(coverageSummarySchema),
+})

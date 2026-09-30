@@ -101,8 +101,8 @@ function TeamRecurrenceContent({ teamId, seasons, seasonsError }: {
       {response.scope.selection_state !== 'VALUE' ? <UnresolvedMatrix response={response} /> : response.columns.length === 0 ? <EmptyState>No final regular team games are available in this resolved scope.</EmptyState> : (
         <>
           <MatrixLegend />
-          <TeamMatrix columns={response.columns} from={from} rows={rows} />
-          <MobileMatrix columns={response.columns} from={from} rows={rows} />
+          <TeamMatrix teamName={response.team.display_name ?? 'Unknown team'} columns={response.columns} from={from} rows={rows} />
+          <MobileMatrix teamName={response.team.display_name ?? 'Unknown team'} columns={response.columns} from={from} rows={rows} />
         </>
       )}
       <Coverage coverage={response.coverage} />
@@ -162,11 +162,11 @@ function cellText(cell: MatrixCell) {
   }
 }
 
-function cellDescription(player: MatrixPlayerRow, column: MatrixColumn, cell: MatrixCell) {
+function cellDescription(teamName: string, player: MatrixPlayerRow, column: MatrixColumn, cell: MatrixCell) {
   const playerName = player.player.display_name ?? 'Unknown player'
   const opponent = column.opponent.display_name ?? 'unknown opponent'
   const gameNumber = column.scheduled_game_number ? `, game ${column.scheduled_game_number}` : ''
-  const context = `${playerName}, ${column.official_date}${gameNumber}, vs ${opponent}, ${column.home_away.toLowerCase()}`
+  const context = `${playerName}, representing ${teamName}, ${column.official_date}${gameNumber}, vs ${opponent}, ${column.home_away.toLowerCase()}`
   switch (cell.state) {
     case 'HR_COUNT': return `${context}, ${cell.hr_count} home run${cell.hr_count === 1 ? '' : 's'}`
     case 'KNOWN_ZERO': return `${context}, verified zero home runs`
@@ -178,7 +178,7 @@ function cellDescription(player: MatrixPlayerRow, column: MatrixColumn, cell: Ma
   }
 }
 
-function TeamMatrix({ columns, from, rows }: { columns: MatrixColumn[]; from: string; rows: MatrixPlayerRow[] }) {
+function TeamMatrix({ teamName, columns, from, rows }: { teamName: string; columns: MatrixColumn[]; from: string; rows: MatrixPlayerRow[] }) {
   const [focus, setFocus] = useState({ row: 0, column: 0 })
   const [open, setOpen] = useState<string | null>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -214,7 +214,7 @@ function TeamMatrix({ columns, from, rows }: { columns: MatrixColumn[]; from: st
   return <div className="hidden overflow-x-auto rounded-xl border md:block" ref={root}><table className="min-w-max border-collapse text-center text-xs"><caption className="sr-only">Team home-run recurrence matrix. Use arrow keys to move between game cells.</caption><thead className="bg-muted/80"><tr><th className="sticky left-0 z-30 min-w-48 bg-muted px-3 py-3 text-left" scope="col">Player</th><th className="sticky left-48 z-30 min-w-24 bg-muted px-3 py-3" scope="col">Season HR</th><th className="sticky left-72 z-30 min-w-24 border-r bg-muted px-3 py-3" scope="col">Window HR</th>{columns.map((column) => <th className="min-w-28 px-2 py-3" key={column.game_id} scope="col"><Link className="underline underline-offset-4" state={{ from }} to={`/games/${column.game_id}`}><span className="block">{column.official_date}</span>{column.scheduled_game_number ? <span className="block">Game {column.scheduled_game_number}</span> : null}<span className="block font-normal">{column.home_away === 'HOME' ? 'vs' : '@'} {column.opponent.abbreviation ?? column.opponent.display_name ?? 'Opponent'}</span></Link></th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr className="border-t" key={row.player.id}><th className="sticky left-0 z-20 bg-background px-3 py-2 text-left" scope="row"><Link className="font-medium underline underline-offset-4" to={`/players/${row.player.id}`}>{row.player.display_name ?? 'Unknown player'}</Link></th><td className="sticky left-48 z-20 bg-background px-3 py-2"><MetricValueView label={`${row.player.display_name ?? 'Player'} season HR`} metric={row.player_season_hr} /></td><td className="sticky left-72 z-20 border-r bg-background px-3 py-2"><MetricValueView label={`${row.player.display_name ?? 'Player'} window HR`} metric={row.window_hr} /></td>{row.cells.map((cell, columnIndex) => {
     const key = `${row.player.id}:${columns[columnIndex].game_id}`
     const actionable = cell.state === 'HR_COUNT'
-    return <td aria-label={cellDescription(row, columns[columnIndex], cell)} className="relative border-l px-2 py-2 outline-offset-[-3px] focus-visible:outline-2 focus-visible:outline-ring" data-matrix-column={columnIndex} data-matrix-row={rowIndex} key={key} onClick={() => actionable && setOpen(open === key ? null : key)} onKeyDown={(event) => {
+    return <td aria-label={cellDescription(teamName, row, columns[columnIndex], cell)} className="relative border-l px-2 py-2 outline-offset-[-3px] focus-visible:outline-2 focus-visible:outline-ring" data-matrix-column={columnIndex} data-matrix-row={rowIndex} key={key} onClick={() => actionable && setOpen(open === key ? null : key)} onKeyDown={(event) => {
       if (event.key === 'Escape' && open === key) { event.preventDefault(); setOpen(null); event.currentTarget.focus(); return }
       if (event.target !== event.currentTarget) return
       const moves: Record<string, [number, number]> = { ArrowLeft: [rowIndex, columnIndex - 1], ArrowRight: [rowIndex, columnIndex + 1], ArrowUp: [rowIndex - 1, columnIndex], ArrowDown: [rowIndex + 1, columnIndex], Home: [rowIndex, 0], End: [rowIndex, columns.length - 1] }
@@ -224,11 +224,11 @@ function TeamMatrix({ columns, from, rows }: { columns: MatrixColumn[]; from: st
   })}</tr>)}</tbody></table></div>
 }
 
-function MobileMatrix({ columns, from, rows }: { columns: MatrixColumn[]; from: string; rows: MatrixPlayerRow[] }) {
+function MobileMatrix({ teamName, columns, from, rows }: { teamName: string; columns: MatrixColumn[]; from: string; rows: MatrixPlayerRow[] }) {
   const [playerId, setPlayerId] = useState(rows[0]?.player.id ?? '')
   const row = rows.find((item) => item.player.id === playerId) ?? rows[0]
   if (!row) return null
-  return <section aria-labelledby="mobile-matrix-title" className="space-y-4 md:hidden"><h2 className="font-semibold" id="mobile-matrix-title">Player game sequence</h2><label className="text-sm font-medium">Player<select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => setPlayerId(event.target.value)} value={row.player.id}>{rows.map((item) => <option key={item.player.id} value={item.player.id}>{item.player.display_name ?? 'Unknown player'}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Season HR</p><MetricValueView label="Season HR" metric={row.player_season_hr} /></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Window HR</p><MetricValueView label="Window HR" metric={row.window_hr} /></div></div><ol className="space-y-2">{columns.map((column, index) => { const cell = row.cells[index]; return <li className="rounded-lg border p-3" key={column.game_id}><div className="flex items-start justify-between gap-3"><div><Link className="font-medium underline underline-offset-4" state={{ from }} to={`/games/${column.game_id}`}>{column.official_date}{column.scheduled_game_number ? ` · Game ${column.scheduled_game_number}` : ''}</Link><p className="text-xs text-muted-foreground">{column.home_away === 'HOME' ? 'vs' : '@'} {column.opponent.display_name ?? 'Opponent'} · {column.home_away.toLowerCase()}</p></div><span aria-label={cellDescription(row, column, cell)} className="font-semibold">{cellText(cell)}</span></div>{cell.state === 'HR_COUNT' ? <div className="mt-2 flex flex-wrap gap-3">{cell.home_run_event_ids.map((eventId, eventIndex) => <Link className="text-sm underline" key={eventId} state={{ from }} to={`/games/${column.game_id}#hr-${eventId}`}>HR {eventIndex + 1}</Link>)}</div> : null}</li> })}</ol></section>
+  return <section aria-labelledby="mobile-matrix-title" className="space-y-4 md:hidden"><h2 className="font-semibold" id="mobile-matrix-title">Player game sequence</h2><label className="text-sm font-medium">Player<select className="mt-1 min-h-11 w-full rounded-md border bg-background px-3" onChange={(event) => setPlayerId(event.target.value)} value={row.player.id}>{rows.map((item) => <option key={item.player.id} value={item.player.id}>{item.player.display_name ?? 'Unknown player'}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Season HR</p><MetricValueView label="Season HR" metric={row.player_season_hr} /></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Window HR</p><MetricValueView label="Window HR" metric={row.window_hr} /></div></div><ol className="space-y-2">{columns.map((column, index) => { const cell = row.cells[index]; return <li className="rounded-lg border p-3" key={column.game_id}><div className="flex items-start justify-between gap-3"><div><Link className="font-medium underline underline-offset-4" state={{ from }} to={`/games/${column.game_id}`}>{column.official_date}{column.scheduled_game_number ? ` · Game ${column.scheduled_game_number}` : ''}</Link><p className="text-xs text-muted-foreground">{column.home_away === 'HOME' ? 'vs' : '@'} {column.opponent.display_name ?? 'Opponent'} · {column.home_away.toLowerCase()}</p></div><span aria-label={cellDescription(teamName, row, column, cell)} className="font-semibold">{cellText(cell)}</span></div>{cell.state === 'HR_COUNT' ? <div className="mt-2 flex flex-wrap gap-3">{cell.home_run_event_ids.map((eventId, eventIndex) => <Link className="text-sm underline" key={eventId} state={{ from }} to={`/games/${column.game_id}#hr-${eventId}`}>HR {eventIndex + 1}</Link>)}</div> : null}</li> })}</ol></section>
 }
 
 function Coverage({ coverage }: { coverage: TeamRecurrenceResponse['coverage'] }) {

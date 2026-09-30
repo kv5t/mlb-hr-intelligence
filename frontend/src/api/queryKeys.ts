@@ -1,3 +1,4 @@
+import { normalizePlayerDetailParams, normalizePlayerRecurrenceParams, normalizePlayerHomeRunsParams, type PlayerDetailParams, type PlayerRecurrenceParams, type PlayerHomeRunsParams } from './params'
 import {
   normalizeGamesParams,
   normalizePlayersParams,
@@ -20,6 +21,9 @@ import {
 } from './params'
 
 export const queryKeys = {
+  playerDetail: (id: string, params: PlayerDetailParams) => ['v1', 'player', id, normalizePlayerDetailParams(params)] as const,
+  playerRecurrence: (id: string, params: PlayerRecurrenceParams) => ['v1', 'player', id, 'recurrence', normalizePlayerRecurrenceParams(params)] as const,
+  playerHomeRuns: (id: string, params: PlayerHomeRunsParams) => ['v1', 'player', id, 'home-runs', normalizePlayerHomeRunsParams(params)] as const,
   seasons: (params: SeasonsParams = {}) => ['v1', 'seasons', normalizeSeasonsParams(params)] as const,
   teams: (params: TeamsParams = {}) => ['v1', 'teams', normalizeTeamsParams(params)] as const,
   players: (params: PlayersParams = {}) => ['v1', 'players', normalizePlayersParams(params)] as const,

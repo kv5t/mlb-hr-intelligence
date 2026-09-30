@@ -139,3 +139,17 @@ export function queryString(params: Record<string, unknown>): string {
   }
   return query.toString()
 }
+
+
+export const playerDetailParamsSchema = teamDetailParamsSchema.extend({ team: uuid.optional() })
+export const playerRecurrenceParamsSchema = playerDetailParamsSchema
+export const playerHomeRunsParamsSchema = playerDetailParamsSchema.extend({
+  ordering: z.enum(['official_date', '-official_date']).optional(),
+  ...pageFields,
+})
+export type PlayerDetailParams = z.input<typeof playerDetailParamsSchema>
+export type PlayerRecurrenceParams = z.input<typeof playerRecurrenceParamsSchema>
+export type PlayerHomeRunsParams = z.input<typeof playerHomeRunsParamsSchema>
+export const normalizePlayerDetailParams = (value: unknown) => normalize(playerDetailParamsSchema, value)
+export const normalizePlayerRecurrenceParams = (value: unknown) => normalize(playerRecurrenceParamsSchema, value)
+export const normalizePlayerHomeRunsParams = (value: unknown) => normalize(playerHomeRunsParamsSchema, value)

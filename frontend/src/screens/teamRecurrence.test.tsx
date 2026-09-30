@@ -63,7 +63,7 @@ describe('Team recurrence matrix', () => {
     const route = `/teams/${UUIDS.teamA}/recurrence?season=2099&window=30G`
     renderApp(route)
     const table = await screen.findByRole('table', { name: /home-run recurrence matrix/i })
-    const cell = within(table).getByLabelText(/Benchmark Player 01.*2 home runs/)
+    const cell = within(table).getByLabelText(/Benchmark Player 01, representing Benchmark Club.*2 home runs/)
     fireEvent.click(cell)
     const eventIds = response.rows[0].cells[0].state === 'HR_COUNT' ? response.rows[0].cells[0].home_run_event_ids : []
     for (const [index, eventId] of eventIds.entries()) {

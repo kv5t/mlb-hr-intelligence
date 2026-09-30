@@ -38,7 +38,7 @@ const definitions = {
   status: z.enum(GAME_STATUSES),
 } as const
 
-export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'teams' | 'teamDetail' | 'teamRecurrence' | 'generic'
+export type RouteSearchScope = 'today' | 'games' | 'gameDetail' | 'league' | 'players' | 'teams' | 'teamDetail' | 'teamRecurrence' | 'playerDetail' | 'playerRecurrence' | 'playerHomeRuns' | 'generic'
 export type UrlStateKey = keyof typeof definitions
 
 const routeDefinitions: Record<
@@ -113,6 +113,9 @@ const routeDefinitions: Record<
     home_away: definitions.home_away,
     row_order: definitions.row_order,
   },
+  playerDetail: { season: definitions.season, window: definitions.window, team: definitions.team, home_away: definitions.home_away, cutoff: definitions.cutoff },
+  playerRecurrence: { season: definitions.season, window: definitions.window, team: definitions.team, home_away: definitions.home_away, cutoff: definitions.cutoff },
+  playerHomeRuns: { season: definitions.season, window: definitions.window, team: definitions.team, home_away: definitions.home_away, cutoff: definitions.cutoff, hr_ordering: definitions.hr_ordering, hr_page: definitions.hr_page, page_size: definitions.page_size },
   generic: definitions,
 }
 

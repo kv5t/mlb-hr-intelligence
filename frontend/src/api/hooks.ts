@@ -1,3 +1,5 @@
+import { normalizePlayerDetailParams, normalizePlayerRecurrenceParams, normalizePlayerHomeRunsParams, type PlayerDetailParams, type PlayerRecurrenceParams, type PlayerHomeRunsParams } from './params'
+import { playerDetailResponseSchema, playerRecurrenceResponseSchema, playerHomeRunsResponseSchema } from './schemas'
 import { useQuery } from '@tanstack/react-query'
 
 import { apiGet } from './client'
@@ -133,4 +135,18 @@ export function useTeamRecurrence(id: string, params: TeamRecurrenceParams) {
     staleTime,
     enabled: id.length > 0,
   })
+}
+
+
+export function usePlayerDetail(id: string, params: PlayerDetailParams) {
+  const normalized = normalizePlayerDetailParams(params)
+  return useQuery({ queryKey: queryKeys.playerDetail(id, normalized), queryFn: ({ signal }) => apiGet({ path: `players/${id}/`, params: normalized, schema: playerDetailResponseSchema, signal }), staleTime, enabled: id.length > 0 })
+}
+export function usePlayerRecurrence(id: string, params: PlayerRecurrenceParams) {
+  const normalized = normalizePlayerRecurrenceParams(params)
+  return useQuery({ queryKey: queryKeys.playerRecurrence(id, normalized), queryFn: ({ signal }) => apiGet({ path: `players/${id}/recurrence/`, params: normalized, schema: playerRecurrenceResponseSchema, signal }), staleTime, enabled: id.length > 0 })
+}
+export function usePlayerHomeRuns(id: string, params: PlayerHomeRunsParams) {
+  const normalized = normalizePlayerHomeRunsParams(params)
+  return useQuery({ queryKey: queryKeys.playerHomeRuns(id, normalized), queryFn: ({ signal }) => apiGet({ path: `players/${id}/home-runs/`, params: normalized, schema: playerHomeRunsResponseSchema, signal }), staleTime, enabled: id.length > 0 })
 }
